@@ -1,8 +1,19 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Gropled";
+  src:
+    url("/fonts/Gropled-Bold.woff2") format("woff2"),
+    url("/fonts/Gropled-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --font-gropled: "Gropled", "Syne", ui-sans-serif, system-ui, sans-serif;
 
   --color-void: #050607;
   --color-ink: #0a0c0e;
@@ -65,6 +76,10 @@
 @layer utilities {
   .font-display {
     font-family: var(--font-display);
+  }
+
+  .font-gropled {
+    font-family: var(--font-gropled);
   }
 
   .drag-region {

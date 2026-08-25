@@ -1,45 +1,109 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BetaBadge } from '@/components/BetaBadge'
 import { CloakIcon } from '@/components/CloakLogo'
 import { TermsPanel } from '@/components/TermsPanel'
 import { GoogleSignInButton } from '@/web/GoogleSignInButton'
+import { ProductsPage } from '@/web/ProductsPage'
 import { trustedLogos } from '@/web/TrustedLogos'
 import { useGoogleAuth } from '@/web/GoogleAuthContext'
 import {
   AvatarBadge,
   CloakMark,
   DiscordMark,
-  FiveMMark,
   IconShell,
   offers,
   QuoteIcon,
   whyPoints,
-  workTiles,
-  WorkTileBanner,
 } from '@/web/WebsiteIcons'
 
-type WebPage = 'home' | 'terms'
+type WebPage = 'home' | 'terms' | 'products'
 
 function scrollTo(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+function pathToPage(pathname: string): WebPage {
+  const path = pathname.replace(/\/+$/, '').toLowerCase()
+  if (path === '/products') return 'products'
+  if (path === '/terms') return 'terms'
+  return 'home'
+}
+
+function pageToPath(page: WebPage) {
+  if (page === 'products') return '/products'
+  if (page === 'terms') return '/terms'
+  return '/'
+}
+
 const voices = [
-  { name: 'Alex', role: 'Server owner', quote: 'Players stop pasting join links. That alone is worth it.' },
-  { name: 'Maya', role: 'Community lead', quote: 'Access is simple: Discord first, then admin approval.' },
-  { name: 'Jonah', role: 'Player', quote: 'I open Cloak, pick a server, and FiveM launches. No hunting IPs.' },
-  { name: 'Rin', role: 'Staff', quote: 'Warnings and penalties live in the app instead of buried Discord threads.' },
+  {
+    name: 'Alex',
+    role: 'Server owner',
+    quote: 'Players stop pasting join links. That alone is worth it.',
+    photo: '/reviews/alex.jpg',
+  },
+  {
+    name: 'Maya',
+    role: 'Community lead',
+    quote: 'Access is simple: Discord first, then admin approval.',
+    photo: '/reviews/maya.jpg',
+  },
+  {
+    name: 'Jonah',
+    role: 'Player',
+    quote: 'I open Cloak, pick a server, and FiveM launches. No hunting IPs.',
+    photo: '/reviews/jonah.jpg',
+  },
+  {
+    name: 'Rin',
+    role: 'Staff',
+    quote: 'Warnings and penalties live in the app instead of buried Discord threads.',
+    photo: '/reviews/rin.jpg',
+  },
 ]
 
 export function WebsiteHome() {
   const { user, logout } = useGoogleAuth()
-  const [page, setPage] = useState<WebPage>('home')
+  const [page, setPage] = useState<WebPage>(() =>
+    typeof window !== 'undefined' ? pathToPage(window.location.pathname) : 'home',
+  )
+
+  function navigate(next: WebPage) {
+    setPage(next)
+    const path = pageToPath(next)
+    if (window.location.pathname !== path) {
+      window.history.pushState({ page: next }, '', path)
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   function goHome(section?: string) {
-    setPage('home')
+    navigate('home')
     if (!section) return
     window.setTimeout(() => scrollTo(section), 40)
   }
+
+  function goProducts() {
+    if (!user) {
+      goHome()
+      return
+    }
+    navigate('products')
+  }
+
+  useEffect(() => {
+    function onPopState() {
+      setPage(pathToPage(window.location.pathname))
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  useEffect(() => {
+    if (page === 'products' && !user) {
+      navigate('home')
+    }
+  }, [page, user])
 
   return (
     <div className="relative z-10 min-h-full">
@@ -51,16 +115,30 @@ export function WebsiteHome() {
             <BetaBadge />
           </button>
           <nav className="hidden items-center justify-center gap-7 text-sm text-mist md:flex">
-            <button type="button" onClick={() => goHome()} className="hover:text-snow">
+            <button
+              type="button"
+              onClick={() => goHome()}
+              className={page === 'home' ? 'text-snow' : 'hover:text-snow'}
+            >
               Home
             </button>
             <button type="button" onClick={() => goHome('offers')} className="hover:text-snow">
               Features
             </button>
-            <button type="button" onClick={() => goHome('work')} className="hover:text-snow">
-              Product
-            </button>
-            <button type="button" onClick={() => setPage('terms')} className="hover:text-snow">
+            {user && (
+              <button
+                type="button"
+                onClick={goProducts}
+                className={page === 'products' ? 'text-snow' : 'hover:text-snow'}
+              >
+                Product
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate('terms')}
+              className={page === 'terms' ? 'text-snow' : 'hover:text-snow'}
+            >
               Terms
             </button>
           </nav>
@@ -90,14 +168,18 @@ export function WebsiteHome() {
         </div>
       </header>
 
-      {page === 'terms' ? (
+      {page === 'terms' && (
         <div className="mx-auto max-w-6xl px-6 py-10">
           <TermsPanel />
         </div>
-      ) : (
+      )}
+
+      {page === 'products' && user && <ProductsPage />}
+
+      {page === 'home' && (
         <main>
           <section className="mx-auto max-w-4xl px-6 pb-8 pt-16 text-center sm:pt-24">
-            <h1 className="font-display text-5xl font-extrabold tracking-tight text-snow sm:text-7xl">
+            <h1 className="font-gropled text-5xl font-bold tracking-tight text-snow sm:text-7xl">
               Join without{' '}
               <span className="bg-gradient-to-r from-signal to-signal-bright bg-clip-text text-transparent">
                 leaking IPs
@@ -107,15 +189,11 @@ export function WebsiteHome() {
               Cloak is the desktop connector for protected FiveM servers. Connection details stay
               inside the app. Admins decide who can join.
             </p>
-            <div className="mx-auto mt-8 flex max-w-lg flex-col items-center justify-center gap-3 sm:flex-row">
-              {user ? (
-                <p className="flex items-center gap-2 rounded-full border border-line bg-ink/60 px-5 py-3 text-sm text-mist">
-                  Signed in as <span className="font-semibold text-snow">{user.name}</span>
-                </p>
-              ) : (
+            {!user && (
+              <div className="mx-auto mt-8 flex max-w-lg flex-col items-center justify-center gap-3 sm:flex-row">
                 <GoogleSignInButton variant="signal" label="Sign in with Google" />
-              )}
-            </div>
+              </div>
+            )}
           </section>
 
           <section className="border-y border-line/50 py-8">
@@ -132,7 +210,7 @@ export function WebsiteHome() {
           </section>
 
           <section id="offers" className="mx-auto max-w-6xl px-6 py-20">
-            <h2 className="font-display text-center text-4xl font-bold text-snow">We offer</h2>
+            <h2 className="font-gropled text-center text-4xl font-bold text-snow">We offer</h2>
             <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {offers.map((item) => (
                 <article key={item.title} className="rounded-2xl border border-line bg-panel/70 p-6">
@@ -162,7 +240,7 @@ export function WebsiteHome() {
               />
             </div>
             <div>
-              <h2 className="font-display text-4xl font-bold text-snow">Why choose us</h2>
+              <h2 className="font-gropled text-4xl font-bold text-snow">Why choose us</h2>
               <p className="mt-5 text-sm leading-relaxed text-mist">
                 Cloak exists so FiveM communities can invite players without publishing join links.
                 Discord verifies who you are. Admins control which servers you see. The desktop app
@@ -183,7 +261,7 @@ export function WebsiteHome() {
               </ul>
               <button
                 type="button"
-                onClick={() => setPage('terms')}
+                onClick={() => navigate('terms')}
                 className="mt-6 text-sm font-semibold text-signal hover:text-signal-bright"
               >
                 Read the terms →
@@ -191,37 +269,12 @@ export function WebsiteHome() {
             </div>
           </section>
 
-          <section id="work" className="mx-auto max-w-6xl px-6 py-20">
-            <h2 className="font-display text-center text-4xl font-bold text-snow">
-              Some pieces of our work
-            </h2>
-            <div className="mt-12 grid gap-5 md:grid-cols-2">
-              {workTiles.map((item) => {
-                const BannerIcon = item.banner
-                return (
-                  <article key={item.title} className="overflow-hidden rounded-2xl border border-line bg-panel/60">
-                    <WorkTileBanner accent={item.accent}>
-                      <span style={{ color: item.accent }}>
-                        <BannerIcon className="h-14 w-14" />
-                      </span>
-                    </WorkTileBanner>
-                    <div className="p-5">
-                      <p className="text-xs font-semibold tracking-wide text-signal uppercase">{item.tag}</p>
-                      <h3 className="mt-2 text-lg font-semibold text-snow">{item.title}</h3>
-                      <p className="mt-1 text-sm text-mist">{item.body}</p>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </section>
-
           <section className="mx-auto max-w-6xl px-6 pb-16">
-            <h2 className="font-display text-3xl font-bold text-snow">What communities say</h2>
+            <h2 className="font-gropled text-3xl font-bold text-snow">What communities say</h2>
             <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {voices.map((item) => (
                 <article key={item.name} className="rounded-2xl border border-line bg-panel/70 p-5">
-                  <AvatarBadge name={item.name} role={item.role} />
+                  <AvatarBadge name={item.name} role={item.role} photo={item.photo} />
                   <p className="text-sm font-semibold text-snow">{item.name}</p>
                   <p className="text-xs text-mist">{item.role}</p>
                   <QuoteIcon className="mt-3 h-4 w-4 text-signal/50" />
@@ -235,56 +288,101 @@ export function WebsiteHome() {
             <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 rounded-3xl bg-signal px-8 py-10 text-void sm:flex-row">
               <div className="flex items-center gap-4">
                 <CloakMark className="h-10 w-10" />
-                <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
+                <h2 className="font-gropled text-3xl font-bold tracking-tight sm:text-4xl">
                   Ready to join the right way?
                 </h2>
               </div>
-              {user ? (
-                <p className="text-sm font-semibold">You are signed in. Open the desktop app next.</p>
-              ) : (
+              {!user && (
                 <GoogleSignInButton compact variant="snow" label="Sign in with Google" />
               )}
             </div>
           </section>
+        </main>
+      )}
 
-          <footer className="border-t border-line/70 px-6 py-12">
-            <div className="mx-auto grid max-w-6xl gap-8 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <p className="text-sm font-semibold text-snow">Product</p>
-                <button type="button" onClick={() => goHome('offers')} className="mt-3 flex items-center gap-2 text-sm text-mist hover:text-snow">
-                  <FiveMMark className="h-4 w-4 text-[#F40552]" /> Features
-                </button>
-                <button type="button" onClick={() => goHome('why')} className="mt-2 flex items-center gap-2 text-sm text-mist hover:text-snow">
-                  <CloakMark className="h-4 w-4" /> Why Cloak
-                </button>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-snow">App</p>
-                <div className="mt-3 flex items-center gap-2 text-sm text-mist">
-                  <CloakMark className="h-4 w-4" /> Desktop connector
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-sm text-mist">
-                  <DiscordMark className="h-4 w-4 text-[#5865F2]" /> Discord verified
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-snow">Legal</p>
-                <button type="button" onClick={() => setPage('terms')} className="mt-3 block text-sm text-mist hover:text-snow">
-                  Terms
-                </button>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
+      {page !== 'terms' && (
+        <footer className="border-t border-line/70 bg-ink/40">
+          <div className="mx-auto max-w-6xl px-6 py-14">
+            <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+              <div className="max-w-xs">
+                <div className="flex items-center gap-2.5">
                   <CloakIcon size="sm" />
-                  <span className="font-display font-bold">Cloak</span>
+                  <div>
+                    <p className="font-display text-base font-bold tracking-tight text-snow">Cloak</p>
+                    <p className="text-[11px] tracking-wide text-mist uppercase">Beta</p>
+                  </div>
                 </div>
-                <p className="mt-3 text-xs leading-relaxed text-mist">
-                  © 2026 Cloak. Join without leaking IPs.
+                <p className="mt-4 text-sm leading-relaxed text-mist">
+                  Desktop connector for protected FiveM servers. Join without leaking IPs.
                 </p>
               </div>
+
+              <div>
+                <p className="text-xs font-semibold tracking-[0.16em] text-snow uppercase">Explore</p>
+                <ul className="mt-4 space-y-2.5">
+                  <li>
+                    <button type="button" onClick={() => goHome()} className="text-sm text-mist transition hover:text-snow">
+                      Home
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" onClick={() => goHome('offers')} className="text-sm text-mist transition hover:text-snow">
+                      Features
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" onClick={() => goHome('why')} className="text-sm text-mist transition hover:text-snow">
+                      Why Cloak
+                    </button>
+                  </li>
+                  {user && (
+                    <li>
+                      <button type="button" onClick={goProducts} className="text-sm text-mist transition hover:text-snow">
+                        Product
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold tracking-[0.16em] text-snow uppercase">App</p>
+                <ul className="mt-4 space-y-2.5 text-sm text-mist">
+                  <li>Desktop connector</li>
+                  <li>Discord verified login</li>
+                  <li>Admin-granted servers</li>
+                </ul>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold tracking-[0.16em] text-snow uppercase">Legal</p>
+                <ul className="mt-4 space-y-2.5">
+                  <li>
+                    <button type="button" onClick={() => navigate('terms')} className="text-sm text-mist transition hover:text-snow">
+                      Terms of use
+                    </button>
+                  </li>
+                  <li>
+                    <a
+                      href="https://discord.gg/2KmAr9TUU"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-mist transition hover:text-snow"
+                    >
+                      <DiscordMark className="h-4 w-4 text-[#5865F2]" />
+                      Discord community
+                    </a>
+                  </li>
+                </ul>
+              </div>
             </div>
-          </footer>
-        </main>
+
+            <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-line/70 pt-6 sm:flex-row sm:items-center">
+              <p className="text-xs text-mist">© 2026 Cloak. All rights reserved.</p>
+              <p className="text-xs text-mist">Join without leaking IPs.</p>
+            </div>
+          </div>
+        </footer>
       )}
     </div>
   )

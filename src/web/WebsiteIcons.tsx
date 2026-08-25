@@ -48,6 +48,19 @@ export function CloakMark({ className }: IconProps) {
 
 /* ── Feature icons ── */
 
+export function PrivateJoinIcon({ className = 'h-5 w-5' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      {/* lock body */}
+      <rect x="3" y="11" width="10" height="9" rx="2" />
+      <path d="M5.5 11V8.5a3 3 0 0 1 5 0V11" strokeLinecap="round" />
+      {/* join arrow into app */}
+      <path d="M14 8h5.5M17 5.5 19.5 8 17 10.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="15" y="14" width="6" height="6" rx="1.2" />
+    </svg>
+  )
+}
+
 export function LinkOffIcon({ className = 'h-5 w-5' }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
@@ -158,8 +171,7 @@ export function WorkTileBanner({ children, accent }: { children: ReactNode; acce
   )
 }
 
-export function AvatarBadge({ name, role }: { name: string; role: string }) {
-  const initial = name.charAt(0).toUpperCase()
+export function AvatarBadge({ name, role, photo }: { name: string; role: string; photo: string }) {
   const roleIcon =
     role.includes('owner') || role.includes('lead') ? (
       <ShieldCheckIcon className="h-3.5 w-3.5" />
@@ -171,9 +183,11 @@ export function AvatarBadge({ name, role }: { name: string; role: string }) {
 
   return (
     <div className="mb-3 flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full border border-signal/30 bg-gradient-to-br from-signal/25 to-signal-dim/15 text-sm font-bold text-signal">
-        {initial}
-      </div>
+      <img
+        src={photo}
+        alt={name}
+        className="h-11 w-11 rounded-full border border-line object-cover"
+      />
       <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-line bg-ink/80 text-signal">
         {roleIcon}
       </div>
@@ -189,7 +203,7 @@ export const offers: { title: string; body: string; visual: OfferVisual }[] = [
   {
     title: 'Private joins',
     body: 'FiveM join links stay inside the desktop app so IPs never land in chat or clipboard.',
-    visual: { type: 'brand', tint: 'fivem', Mark: FiveMMark },
+    visual: { type: 'icon', Icon: PrivateJoinIcon },
   },
   {
     title: 'Discord verified',
