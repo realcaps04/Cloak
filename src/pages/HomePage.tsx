@@ -173,6 +173,7 @@ export function HomePage() {
   const [activeNav, setActiveNav] = useState<NavId>('servers')
   const [activeTermsSection, setActiveTermsSection] = useState<string | null>(null)
   const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
 
   const handleJoin = useCallback(async (serverId: string) => {
     if (window.cloak?.joinServer) {
@@ -185,9 +186,17 @@ export function HomePage() {
   }, [])
 
   useEffect(() => {
-    const off = window.cloak?.onUpdateAvailable?.((info) => {
+    const api = window.cloak
+    if (!api) return
+
+    const off = api.onUpdateAvailable?.((info) => {
       setUpdateAvailable(info.update)
+      setUpdateVersion(info.update ? info.newVersion || null : null)
     })
+
+    // Check as soon as the shell loads so the Updates badge appears without opening the page.
+    void api.checkForUpdates?.().catch(() => undefined)
+
     return () => off?.()
   }, [])
 
@@ -197,115 +206,158 @@ export function HomePage() {
 
   return (
     <div className="relative z-10 flex h-full min-h-0 overflow-hidden">
-      {sidebarOpen && (
-        <aside className="flex h-full w-64 shrink-0 flex-col border-r border-line/80 bg-panel/40 px-5 py-6">
-          <div className="flex h-full min-h-0 flex-col">
-            <div className="flex items-center gap-2">
-              <CloakIcon size="md" variant="app" />
-              <div className="min-w-0 flex-1">
-                <BetaBadge className="shrink-0" />
-              </div>
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(false)}
-                className="no-drag inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-ink/50 text-mist transition hover:border-snow/20 hover:text-snow"
-                aria-label="Hide sidebar"
-                title="Hide sidebar"
-              >
-                <ChevronLeftIcon className="h-4 w-4" />
-              </button>
+      <aside
+        className={`cloak-sidebar flex h-full shrink-0 flex-col overflow-hidden border-r border-line/80 bg-panel/40 ${
+          sidebarOpen ? 'cloak-sidebar-open' : 'cloak-sidebar-closed'
+        }`}
+        aria-hidden={!sidebarOpen}
+      >
+        <div
+          className={`flex h-full min-h-0 w-64 flex-col px-5 py-6 transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            sidebarOpen
+              ? 'translate-x-0 opacity-100 delay-75'
+              : 'pointer-events-none -translate-x-3 opacity-0'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <CloakIcon size="md" variant="app" />
+            <div className="min-w-0 flex-1">
+              <BetaBadge className="shrink-0" />
             </div>
-
-            <nav className="mt-10 min-h-0 flex-1 space-y-1 overflow-y-auto text-sm">
-              {NAV_ITEMS.map((item) => {
-                const active = item.id === activeNav
-                return (
-                  <div key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveNav(item.id)}
-                      className={`no-drag flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-medium transition ${
-                        active
-                          ? 'bg-signal/10 text-signal'
-                          : 'text-mist hover:bg-ink/60 hover:text-snow'
-                      }`}
-                    >
-                      <span>{item.label}</span>
-                      {item.id === 'updates' && updateAvailable ? (
-                        <span className="h-2 w-2 rounded-full bg-signal" aria-label="Update available" />
-                      ) : null}
-                    </button>
-
-                    {item.id === 'terms' && activeNav === 'terms' && (
-                      <div className="mt-1 ml-2 space-y-0.5 border-l border-line/60 pl-2">
-                        {TERMS_SECTIONS.map((section) => {
-                          const sectionActive = activeTermsSection === section.id
-                          return (
-                            <button
-                              key={section.id}
-                              type="button"
-                              onClick={() => {
-                                setActiveTermsSection(section.id)
-                                scrollToTermsSection(section.id)
-                              }}
-                              title={section.title.replace(/\*\*/g, '')}
-                              className={`no-drag w-full truncate rounded-md px-2 py-1.5 text-left text-[11px] leading-snug transition ${
-                                sectionActive
-                                  ? 'bg-signal/10 font-medium text-signal'
-                                  : 'text-mist/90 hover:bg-ink/60 hover:text-snow'
-                              }`}
-                            >
-                              {section.shortLabel.replace(/\*\*/g, '')}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </nav>
-
-            <div className="mt-auto border-t border-line pt-4">
-              <div className="flex items-center gap-3">
-                <img
-                  src={avatarUrl(user)}
-                  alt=""
-                  className="h-10 w-10 shrink-0 rounded-full border border-line object-cover"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-snow">{name}</p>
-                  <p className="truncate text-xs text-mist">@{user.username}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={logout}
-                className="no-drag mt-3 w-full rounded-lg border border-line px-3 py-2 text-xs font-medium text-mist transition hover:border-snow/20 hover:text-snow"
-              >
-                Sign out
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              tabIndex={sidebarOpen ? 0 : -1}
+              className="no-drag inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-ink/50 text-mist transition hover:border-snow/20 hover:text-snow"
+              aria-label="Hide sidebar"
+              title="Hide sidebar"
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+            </button>
           </div>
-        </aside>
-      )}
+
+          <nav className="mt-10 min-h-0 flex-1 space-y-1 overflow-y-auto text-sm">
+            {NAV_ITEMS.map((item) => {
+              const active = item.id === activeNav
+              return (
+                <div key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNav(item.id)}
+                    tabIndex={sidebarOpen ? 0 : -1}
+                    className={`no-drag flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-medium transition ${
+                      active
+                        ? 'bg-signal/10 text-signal'
+                        : 'text-mist hover:bg-ink/60 hover:text-snow'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    {item.id === 'updates' && updateAvailable ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="rounded-full bg-signal/20 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-signal uppercase">
+                          New
+                        </span>
+                        <span className="h-2 w-2 rounded-full bg-signal" aria-label="Update available" />
+                      </span>
+                    ) : null}
+                  </button>
+
+                  {item.id === 'terms' && activeNav === 'terms' && (
+                    <div className="mt-1 ml-2 space-y-0.5 border-l border-line/60 pl-2">
+                      {TERMS_SECTIONS.map((section) => {
+                        const sectionActive = activeTermsSection === section.id
+                        return (
+                          <button
+                            key={section.id}
+                            type="button"
+                            onClick={() => {
+                              setActiveTermsSection(section.id)
+                              scrollToTermsSection(section.id)
+                            }}
+                            tabIndex={sidebarOpen ? 0 : -1}
+                            title={section.title.replace(/\*\*/g, '')}
+                            className={`no-drag w-full truncate rounded-md px-2 py-1.5 text-left text-[11px] leading-snug transition ${
+                              sectionActive
+                                ? 'bg-signal/10 font-medium text-signal'
+                                : 'text-mist/90 hover:bg-ink/60 hover:text-snow'
+                            }`}
+                          >
+                            {section.shortLabel.replace(/\*\*/g, '')}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </nav>
+
+          <div className="mt-auto border-t border-line pt-4">
+            <div className="flex items-center gap-3">
+              <img
+                src={avatarUrl(user)}
+                alt=""
+                className="h-10 w-10 shrink-0 rounded-full border border-line object-cover"
+                referrerPolicy="no-referrer"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-snow">{name}</p>
+                <p className="truncate text-xs text-mist">@{user.username}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={logout}
+              tabIndex={sidebarOpen ? 0 : -1}
+              className="no-drag mt-3 w-full rounded-lg border border-line px-3 py-2 text-xs font-medium text-mist transition hover:border-snow/20 hover:text-snow"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </aside>
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-6 py-6 lg:px-8">
+        {updateAvailable && activeNav !== 'updates' ? (
+          <div className="animate-rise mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-signal/30 bg-signal/10 px-4 py-3">
+            <p className="text-sm text-snow">
+              <span className="font-semibold text-signal">Update ready.</span>{' '}
+              {updateVersion ? (
+                <>
+                  Cloak Desktop <span className="font-semibold">v{updateVersion}</span> is available.
+                </>
+              ) : (
+                <>A newer Cloak Desktop build is available.</>
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => setActiveNav('updates')}
+              className="no-drag rounded-full bg-signal px-4 py-2 text-xs font-bold text-void transition hover:bg-signal-bright"
+            >
+              Download & install
+            </button>
+          </div>
+        ) : null}
+
         <div className="animate-rise flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
-            {!sidebarOpen && (
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(true)}
-                className="no-drag mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-panel/60 text-mist transition hover:border-snow/20 hover:text-snow"
-                aria-label="Show sidebar"
-                title="Show sidebar"
-              >
-                <MenuIcon className="h-4 w-4" />
-              </button>
-            )}
-
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              aria-hidden={sidebarOpen}
+              tabIndex={sidebarOpen ? -1 : 0}
+              className={`no-drag mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-panel/60 text-mist transition-[opacity,transform,border-color,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-snow/20 hover:text-snow ${
+                sidebarOpen
+                  ? 'pointer-events-none w-0 scale-90 overflow-hidden border-transparent opacity-0'
+                  : 'scale-100 opacity-100'
+              }`}
+              aria-label="Show sidebar"
+              title="Show sidebar"
+            >
+              <MenuIcon className="h-4 w-4" />
+            </button>
             <div>
               <h1 className="font-display text-3xl font-bold tracking-tight text-snow">
                 Welcome back, {name}
@@ -358,7 +410,11 @@ export function HomePage() {
           {activeNav === 'updates' && (
             <UpdatesPanel
               updateAvailable={updateAvailable}
-              onAvailability={(available) => setUpdateAvailable(available)}
+              updateVersion={updateVersion}
+              onAvailability={(available, info) => {
+                setUpdateAvailable(available)
+                setUpdateVersion(available ? info?.newVersion || null : null)
+              }}
             />
           )}
           {activeNav === 'terms' && <TermsPanel />}

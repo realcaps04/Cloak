@@ -48,7 +48,7 @@ const topics = [
     items: [
       {
         q: 'Where do I download Cloak Desktop?',
-        a: 'Sign in on the website, open Product, then use Download for Windows. Run Cloak_*.exe on Windows 10/11 x64.',
+        a: 'Sign in on the website, open Product, then use Download for Windows. Run Cloak.exe on Windows 10/11 x64.',
       },
       {
         q: 'Windows SmartScreen blocks the installer',

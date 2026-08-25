@@ -1,12 +1,11 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
-/** Ensure electron-updater can find publish config (portable skips this otherwise). */
+/** Portable builds skip default app-update.yml; write a public generic feed instead. */
 exports.default = async function afterPack(context) {
   const yml = [
-    'provider: github',
-    'owner: realcaps04',
-    'repo: Cloak',
+    'provider: generic',
+    'url: https://github.com/realcaps04/Cloak/releases/latest/download',
     'updaterCacheDirName: cloak-updater',
     '',
   ].join('\n')

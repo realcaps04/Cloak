@@ -10,6 +10,7 @@
   },
   "icon": "build/icon.png",
   "afterPack": "./scripts/afterPack.cjs",
+  "afterAllArtifactBuild": "./scripts/afterAllArtifactBuild.cjs",
   "files": [
     "dist-electron",
     "dist"
@@ -29,7 +30,7 @@
         "arch": ["x64"]
       }
     ],
-    "artifactName": "Cloak_${version}.${ext}"
+    "artifactName": "Cloak.${ext}"
   },
   "nsis": {
     "oneClick": false,

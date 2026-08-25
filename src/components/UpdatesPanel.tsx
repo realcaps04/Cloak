@@ -27,13 +27,19 @@ function formatBytes(n: number) {
 
 export function UpdatesPanel({
   updateAvailable,
+  updateVersion,
   onAvailability,
 }: {
   updateAvailable: boolean
+  updateVersion?: string | null
   onAvailability: (available: boolean, info?: UpdateAvailability) => void
 }) {
   const [currentVersion, setCurrentVersion] = useState('…')
-  const [info, setInfo] = useState<UpdateAvailability | null>(null)
+  const [info, setInfo] = useState<UpdateAvailability | null>(
+    updateAvailable
+      ? { update: true, version: '', newVersion: updateVersion || undefined }
+      : null,
+  )
   const [checking, setChecking] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [progress, setProgress] = useState<DownloadProgress | null>(null)
@@ -41,7 +47,6 @@ export function UpdatesPanel({
   const [installing, setInstalling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasUpdater, setHasUpdater] = useState(false)
-  const [portable, setPortable] = useState(false)
 
   const applyAvailability = useCallback(
     (next: UpdateAvailability) => {
@@ -65,9 +70,6 @@ export function UpdatesPanel({
 
     try {
       const result = await api.checkForUpdates()
-      if (result && 'portable' in result && typeof result.portable === 'boolean') {
-        setPortable(result.portable)
-      }
       if (result && 'error' in result && result.error) {
         setError(result.message || 'Could not check for updates.')
       }
@@ -84,7 +86,6 @@ export function UpdatesPanel({
     if (!api) return
 
     void api.getAppVersion?.().then(setCurrentVersion).catch(() => setCurrentVersion('unknown'))
-    void api.getUpdateRuntimeInfo?.().then((runtime) => setPortable(runtime.portable))
 
     const offAvailable = api.onUpdateAvailable?.((payload) => {
       applyAvailability(payload)
@@ -100,7 +101,11 @@ export function UpdatesPanel({
     const offDownloaded = api.onUpdateDownloaded?.(() => {
       setDownloading(false)
       setDownloaded(true)
-      setProgress((prev) => (prev ? { ...prev, percent: 100 } : { percent: 100, transferred: 0, total: 0, bytesPerSecond: 0 }))
+      setProgress((prev) =>
+        prev
+          ? { ...prev, percent: 100 }
+          : { percent: 100, transferred: 0, total: 0, bytesPerSecond: 0 },
+      )
     })
     const offError = api.onUpdateError?.((payload) => {
       setDownloading(false)
@@ -119,6 +124,7 @@ export function UpdatesPanel({
   }, [applyAvailability, checkForUpdates])
 
   const available = info?.update ?? updateAvailable
+  const remoteVersion = info?.newVersion || updateVersion || null
 
   async function startDownload() {
     setError(null)
@@ -158,7 +164,7 @@ export function UpdatesPanel({
           <div>
             <p className="text-xs font-semibold tracking-[0.16em] text-mist uppercase">Installed</p>
             <p className="mt-1 font-display text-2xl font-bold text-snow">v{currentVersion}</p>
-            <p className="mt-1 text-xs text-mist">Cloak Desktop · checks GitHub Releases automatically</p>
+            <p className="mt-1 text-xs text-mist">Cloak Desktop</p>
           </div>
           <button
             type="button"
@@ -172,12 +178,12 @@ export function UpdatesPanel({
 
         {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
 
-        {!error && available && info?.newVersion ? (
+        {!error && available && remoteVersion ? (
           <div className="mt-6 rounded-xl border border-signal/30 bg-signal/10 px-4 py-4">
             <p className="text-sm font-semibold text-signal">Update available</p>
             <p className="mt-1 text-sm text-mist">
-              Version <span className="font-semibold text-snow">v{info.newVersion}</span> is ready.
-              Download inside Cloak Desktop, then install and relaunch.
+              Version <span className="font-semibold text-snow">v{remoteVersion}</span> is ready.
+              Download it here, then install and relaunch Cloak Desktop.
             </p>
 
             {progress ? (
@@ -187,7 +193,7 @@ export function UpdatesPanel({
                     {downloading
                       ? 'Downloading package…'
                       : downloaded
-                        ? 'Package ready'
+                        ? 'Package ready to install'
                         : 'Progress'}
                   </span>
                   <span>
@@ -239,13 +245,6 @@ export function UpdatesPanel({
                 </button>
               ) : null}
             </div>
-
-            {portable ? (
-              <p className="mt-3 text-xs text-mist">
-                Tip: use the installed Cloak Desktop setup (not the portable .exe) for the smoothest
-                install-and-relaunch flow.
-              </p>
-            ) : null}
           </div>
         ) : null}
 
@@ -255,8 +254,7 @@ export function UpdatesPanel({
 
         {!hasUpdater ? (
           <p className="mt-6 text-sm text-mist">
-            Open the installed Cloak Desktop app to download and install updates from GitHub
-            Releases.
+            Open the installed Cloak Desktop app to download and install updates.
           </p>
         ) : null}
       </div>

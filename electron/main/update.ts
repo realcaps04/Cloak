@@ -17,9 +17,10 @@ let checkTimer: NodeJS.Timeout | null = null
 let lastDownloadedFile: string | null = null
 
 const UPDATE_FEED = {
-  provider: 'github' as const,
-  owner: 'realcaps04',
-  repo: 'Cloak',
+  // Generic feed reads latest.yml from the GitHub latest-release download URL.
+  // Requires the repo (or at least release assets) to be publicly readable.
+  provider: 'generic' as const,
+  url: 'https://github.com/realcaps04/Cloak/releases/latest/download',
 }
 
 function isPortableRuntime() {
@@ -29,21 +30,29 @@ function isPortableRuntime() {
 function ensureAppUpdateYml() {
   try {
     const dest = path.join(process.resourcesPath, 'app-update.yml')
-    if (fs.existsSync(dest)) return
-    fs.writeFileSync(
-      dest,
-      [
-        'provider: github',
-        'owner: realcaps04',
-        'repo: Cloak',
-        'updaterCacheDirName: cloak-updater',
-        '',
-      ].join('\n'),
-      'utf8',
-    )
+    const yml = [
+      'provider: generic',
+      'url: https://github.com/realcaps04/Cloak/releases/latest/download',
+      'updaterCacheDirName: cloak-updater',
+      '',
+    ].join('\n')
+    // Always refresh so older portable extracts pick up the new feed.
+    fs.writeFileSync(dest, yml, 'utf8')
   } catch (error) {
     console.warn('[cloak] Could not write app-update.yml:', error)
   }
+}
+
+function friendlyUpdateError(error: Error) {
+  const message = error?.message || 'Update check failed'
+  if (/404|releases\.atom|authentication token/i.test(message)) {
+    return (
+      'Could not reach Cloak updates on GitHub (404). ' +
+      'Make the GitHub repo public (Settings → Danger zone → Change visibility), ' +
+      'publish a Latest release with Cloak.exe + latest.yml, then try again.'
+    )
+  }
+  return message
 }
 
 function configureUpdater() {
@@ -109,7 +118,7 @@ export function update(win: Electron.BrowserWindow) {
     console.error('[cloak] Updater error:', error.message)
     if (!win.isDestroyed()) {
       win.webContents.send('update-error', {
-        message: error?.message || 'Update check failed',
+        message: friendlyUpdateError(error),
         error,
       })
     }
@@ -141,7 +150,7 @@ export function update(win: Electron.BrowserWindow) {
         }
       } catch (error) {
         const resolvedError = error instanceof Error ? error : new Error('Network error')
-        return { message: resolvedError.message, error: resolvedError }
+        return { message: friendlyUpdateError(resolvedError), error: resolvedError }
       }
     })
 
@@ -153,7 +162,10 @@ export function update(win: Electron.BrowserWindow) {
         (error, progressInfo) => {
           if (error) {
             isDownloading = false
-            event.sender.send('update-error', { message: error.message, error })
+            event.sender.send('update-error', {
+              message: friendlyUpdateError(error),
+              error,
+            })
           } else if (progressInfo) {
             event.sender.send('download-progress', progressInfo)
           }
@@ -180,9 +192,7 @@ export function update(win: Electron.BrowserWindow) {
         return { ok: true as const, portable: isPortableRuntime() }
       } catch (error) {
         console.error('[cloak] Install failed:', error)
-        void shell.openExternal(
-          `https://github.com/${UPDATE_FEED.owner}/${UPDATE_FEED.repo}/releases/latest`,
-        )
+        void shell.openExternal('https://github.com/realcaps04/Cloak/releases/latest')
         return {
           ok: false as const,
           portable: isPortableRuntime(),

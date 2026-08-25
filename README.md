@@ -118,7 +118,7 @@ npm run build
 
 Windows installer lands at:
 
-`C:\Users\ASUS\AppData\Local\cloak-release\0.1.0\Cloak_0.1.0.exe`
+`C:\Users\ASUS\AppData\Local\cloak-release\<version>\Cloak.exe`
 
 (Built outside OneDrive to avoid Windows file-lock errors.)
 
@@ -127,8 +127,8 @@ Windows installer lands at:
 3. Set on Vercel (and local `.env` if needed):
 
 ```env
-VITE_CLOAK_DOWNLOAD_URL=https://github.com/realcaps04/Cloak/releases/latest/download/Cloak_0.1.0.exe
-VITE_CLOAK_APP_VERSION=0.1.0
+VITE_CLOAK_DOWNLOAD_URL=https://github.com/realcaps04/Cloak/releases/latest/download/Cloak.exe
+VITE_CLOAK_APP_VERSION=
 ```
 
 4. Redeploy the website. The Products page **Download for Windows** button uses that URL.

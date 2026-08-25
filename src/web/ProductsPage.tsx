@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react'
 import { BetaBadge } from '@/components/BetaBadge'
 import { CloakIcon, CLOAK_APP_ICON_SRC } from '@/components/CloakLogo'
-import { getCloakAppVersion, getCloakDownloadUrl } from '@/lib/web'
+import { fetchLatestCloakRelease, getCloakDownloadUrl } from '@/lib/web'
 import { AdminIcon, DiscordMark, FiveMMark, ShieldCheckIcon } from '@/web/WebsiteIcons'
 
 const userPoints = [
@@ -16,8 +17,8 @@ const adminPoints = [
 ]
 
 const installSteps = [
-  'Download the Windows installer (x64).',
-  'Run Cloak_*.exe and complete setup.',
+  'Download the Windows app (x64).',
+  'Run Cloak.exe and complete setup.',
   'Open Cloak Desktop and sign in with Discord.',
   'Join only the servers an admin grants you.',
 ]
@@ -40,8 +41,20 @@ function DownloadIcon({ className }: { className?: string }) {
 }
 
 export function ProductsPage() {
-  const downloadUrl = getCloakDownloadUrl()
-  const version = getCloakAppVersion()
+  const [downloadUrl, setDownloadUrl] = useState(getCloakDownloadUrl())
+  const [version, setVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchLatestCloakRelease().then((release) => {
+      if (cancelled) return
+      setDownloadUrl(release.downloadUrl)
+      setVersion(release.version === 'latest' ? null : release.version)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <main className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pt-20">
@@ -68,7 +81,9 @@ export function ProductsPage() {
                     <h2 className="font-gropled text-2xl font-bold text-snow">Cloak Desktop</h2>
                     <BetaBadge />
                   </div>
-                  <p className="mt-1 text-sm text-mist">Desktop app for players · v{version}</p>
+                  <p className="mt-1 text-sm text-mist">
+                    Desktop app for players{version ? ` · v${version}` : ' · latest release'}
+                  </p>
                 </div>
               </div>
               <span className="rounded-full border border-signal/30 bg-signal/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-signal uppercase">
@@ -117,7 +132,7 @@ export function ProductsPage() {
               </a>
               <div className="inline-flex items-center gap-2 text-xs text-mist">
                 <WindowsIcon className="h-4 w-4 text-mist" />
-                Windows 10/11 · x64 · NSIS installer
+                Windows 10/11 · x64 · latest release
               </div>
             </div>
 
