@@ -19,11 +19,25 @@ const GITHUB_REPO = 'Cloak'
 /** Stable filename so /releases/latest/download/Cloak.exe always hits the newest release. */
 export const CLOAK_RELEASE_EXE = 'Cloak.exe'
 
+/** Portable Admin build published beside Desktop on the same GitHub release. */
+export const CLOAK_ADMIN_RELEASE_EXE = 'CloakAdmin.exe'
+
+function githubLatestDownloadUrl(filename: string) {
+  return `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/${filename}`
+}
+
 /** Always resolves to the current GitHub “latest” release asset. */
 export function getCloakDownloadUrl() {
   return (
     import.meta.env.VITE_CLOAK_DOWNLOAD_URL?.trim() ||
-    `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/${CLOAK_RELEASE_EXE}`
+    githubLatestDownloadUrl(CLOAK_RELEASE_EXE)
+  )
+}
+
+export function getCloakAdminDownloadUrl() {
+  return (
+    import.meta.env.VITE_CLOAK_ADMIN_DOWNLOAD_URL?.trim() ||
+    githubLatestDownloadUrl(CLOAK_ADMIN_RELEASE_EXE)
   )
 }
 
@@ -37,6 +51,38 @@ export type LatestCloakRelease = {
   publishedAt: string | null
 }
 
+type GithubLatestReleasePayload = {
+  tag_name?: string
+  published_at?: string
+  assets?: { name: string; browser_download_url: string }[]
+}
+
+function pickReleaseExe(
+  assets: { name: string; browser_download_url: string }[],
+  preferredName: string,
+  match: (name: string) => boolean,
+) {
+  return (
+    assets.find((a) => a.name === preferredName) ||
+    assets.find((a) => match(a.name) && !a.name.includes('__'))
+  )
+}
+
+async function fetchGithubLatestRelease(): Promise<GithubLatestReleasePayload | null> {
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+      {
+        headers: { Accept: 'application/vnd.github+json' },
+      },
+    )
+    if (!res.ok) return null
+    return (await res.json()) as GithubLatestReleasePayload
+  } catch {
+    return null
+  }
+}
+
 /**
  * Resolve the newest published Windows build from GitHub Releases.
  * Falls back to the stable /latest/download/Cloak.exe URL when the API is unavailable.
@@ -48,35 +94,44 @@ export async function fetchLatestCloakRelease(): Promise<LatestCloakRelease> {
     publishedAt: null,
   }
 
-  try {
-    const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
-      {
-        headers: { Accept: 'application/vnd.github+json' },
-      },
-    )
-    if (!res.ok) return fallback
+  const data = await fetchGithubLatestRelease()
+  if (!data) return fallback
 
-    const data = (await res.json()) as {
-      tag_name?: string
-      published_at?: string
-      assets?: { name: string; browser_download_url: string }[]
-    }
+  const assets = data.assets ?? []
+  const exe = pickReleaseExe(
+    assets,
+    CLOAK_RELEASE_EXE,
+    (name) => /^Cloak(?!Admin).*\.exe$/i.test(name),
+  )
+  const version = (data.tag_name || '').replace(/^v/i, '') || fallback.version
 
-    const assets = data.assets ?? []
-    const exe =
-      assets.find((a) => a.name === CLOAK_RELEASE_EXE) ||
-      assets.find((a) => /^Cloak.*\.exe$/i.test(a.name) && !a.name.includes('__')) ||
-      assets.find((a) => /\.exe$/i.test(a.name))
+  return {
+    version,
+    downloadUrl: exe?.browser_download_url || fallback.downloadUrl,
+    publishedAt: data.published_at ?? null,
+  }
+}
 
-    const version = (data.tag_name || '').replace(/^v/i, '') || fallback.version
+/** Resolve the newest Cloak Admin Windows portable from the same GitHub Releases feed. */
+export async function fetchLatestCloakAdminRelease(): Promise<LatestCloakRelease> {
+  const fallback: LatestCloakRelease = {
+    version: getCloakAppVersion(),
+    downloadUrl: getCloakAdminDownloadUrl(),
+    publishedAt: null,
+  }
 
-    return {
-      version,
-      downloadUrl: exe?.browser_download_url || fallback.downloadUrl,
-      publishedAt: data.published_at ?? null,
-    }
-  } catch {
-    return fallback
+  const data = await fetchGithubLatestRelease()
+  if (!data) return fallback
+
+  const assets = data.assets ?? []
+  const exe = pickReleaseExe(assets, CLOAK_ADMIN_RELEASE_EXE, (name) =>
+    /^CloakAdmin.*\.exe$/i.test(name),
+  )
+  const version = (data.tag_name || '').replace(/^v/i, '') || fallback.version
+
+  return {
+    version,
+    downloadUrl: exe?.browser_download_url || fallback.downloadUrl,
+    publishedAt: data.published_at ?? null,
   }
 }

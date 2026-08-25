@@ -140,6 +140,35 @@ VITE_CLOAK_APP_VERSION=
 
 5. Redeploy the website if needed. Products download uses `/releases/latest/download/Cloak.exe`.
 
+### Microsoft Store
+
+See **[STORE.md](./STORE.md)** — short checklist. Build with:
+
+```bash
+npm run build:store
+```
+
+Upload the `.appx` from `C:\Users\ASUS\AppData\Local\cloak-store\<version>\` in Partner Center. That path avoids Smart App Control blocks from unsigned `Cloak.exe` downloads.
+
+### Cloak Admin (separate folder)
+
+Staff console lives in the sibling repo **`../Cloak_Admin`** so it can run beside this player app without sharing ports or `%AppData%` sessions.
+
+```bash
+# Terminal A — players (this folder)
+npm run dev
+
+# Terminal B — admins
+cd ../Cloak_Admin
+npm install
+npm run dev
+```
+
+Admin uses port **5175** and Discord callback **http://127.0.0.1:19284/callback** (players keep **19283**).  
+Packaged build: `npm run build` in `Cloak_Admin` → `CloakAdmin.exe` under `%LocalAppData%\cloak-admin-release\`.
+
+This repo still has optional `npm run dev:admin` / `npm run build:admin` dual-mode scripts; prefer the standalone `Cloak_Admin` folder for day-to-day work.
+
 ### How website auth works
 
 1. User opens the hosted site (or localhost)

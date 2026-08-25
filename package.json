@@ -13,9 +13,12 @@
   "type": "module",
   "main": "dist-electron/main/index.js",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 5173",
+    "dev:admin": "vite --mode admin --port 5175",
     "web": "vite --mode web --port 5174 --strictPort --open",
     "build": "vite build && electron-builder",
+    "build:admin": "vite build --mode admin && electron-builder --config electron-builder.admin.json",
+    "build:store": "vite build && electron-builder --config electron-builder.store.json",
     "build:web": "vite build --mode web",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

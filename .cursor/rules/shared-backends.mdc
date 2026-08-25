@@ -1,0 +1,25 @@
+---
+description: Cloak and Cloak_Admin share Discord, Google, and Convex backends
+alwaysApply: true
+---
+
+# Shared backends with Cloak_Admin
+
+**Cloak** and **Cloak_Admin** use the **exact same**:
+
+- Discord Client ID + Secret (one Discord application; both OAuth redirects)
+- Google Client ID
+- Convex URL / deployment / keys
+
+Only the apps themselves are unique: folders, ports (5173 vs 5175), OAuth callbacks (19283 vs 19284), protocol, userData, exe names, and `CLOAK_APP_ROLE`.
+
+## Do not
+
+- Create a separate Discord application, Google OAuth client, or Convex project for Admin unless the user explicitly asks.
+- Invent divergent shared secrets in `.env` / docs / build config.
+
+## Do
+
+- Keep shared env values identical across `Cloak/.env` and `Cloak_Admin/.env`.
+- Document both Discord redirects on the same Discord app.
+- Treat Admin uniqueness as app identity only (`CLOAK_APP_ROLE=admin`, callback `19284`, port `5175`).

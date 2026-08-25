@@ -8,6 +8,7 @@ const RUNTIME_KEYS = [
   'DISCORD_GUILD_NAME',
   'DISCORD_INVITE_URL',
   'DISCORD_REDIRECT_URI',
+  'DISCORD_ADMIN_REDIRECT_URI',
   'CONVEX_URL',
   'VITE_CONVEX_URL',
 ]
@@ -69,4 +70,11 @@ exports.default = async function afterPack(context) {
   console.log('[cloak] Wrote', dest)
 
   writeRuntimeEnv(context)
+
+  const productName = context.packager?.appInfo?.productName || ''
+  const role =
+    process.env.CLOAK_APP_ROLE === 'admin' || /admin/i.test(productName) ? 'admin' : 'user'
+  const rolePath = path.join(context.appOutDir, 'resources', 'app-role.json')
+  fs.writeFileSync(rolePath, `${JSON.stringify({ role }, null, 2)}\n`, 'utf8')
+  console.log('[cloak] Wrote', rolePath, `(${role})`)
 }

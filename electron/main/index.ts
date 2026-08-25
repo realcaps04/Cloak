@@ -3,6 +3,12 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs'
+import {
+  getAppDisplayName,
+  getAppProtocol,
+  getAppUserModelId,
+  isAdminApp,
+} from './app-role'
 import { update } from './update'
 import {
   startDiscordAuth,
@@ -30,8 +36,51 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 process.env.APP_ROOT = path.join(__dirname, '../..')
 
+// Dev admin runs on :5175 — force role before userData / single-instance lock.
+if (
+  process.env.VITE_DEV_SERVER_URL?.includes(':5175') ||
+  process.env.VITE_CLOAK_APP_ROLE === 'admin' ||
+  process.env.CLOAK_APP_ROLE === 'admin'
+) {
+  process.env.CLOAK_APP_ROLE = 'admin'
+  process.env.VITE_CLOAK_APP_ROLE = 'admin'
+}
+
+function applyEnvFile(envPath: string, seen: Set<string>) {
+  if (!fs.existsSync(envPath)) return 0
+  let added = 0
+  const text = fs.readFileSync(envPath, 'utf8')
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    const key = trimmed.slice(0, eq).trim().replace(/^\uFEFF/, '')
+    const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
+    if (!key || seen.has(key)) continue
+    // Never let a later .env file downgrade an already-selected admin role.
+    if (
+      (key === 'CLOAK_APP_ROLE' || key === 'VITE_CLOAK_APP_ROLE') &&
+      process.env.CLOAK_APP_ROLE === 'admin'
+    ) {
+      seen.add(key)
+      continue
+    }
+    process.env[key] = value
+    seen.add(key)
+    added += 1
+  }
+  return added
+}
+
 function envFileCandidates() {
   const candidates: string[] = []
+  const admin = process.env.CLOAK_APP_ROLE === 'admin' || process.env.VITE_CLOAK_APP_ROLE === 'admin'
+
+  // Admin mode: prefer .env.admin so role + redirects win.
+  if (admin) {
+    candidates.push(path.join(process.env.APP_ROOT!, '.env.admin'))
+  }
 
   // Packaged / portable: secrets are baked into resources at build time.
   try {
@@ -51,16 +100,17 @@ function envFileCandidates() {
     // app path may not be ready yet
   }
 
-  const roots = [
-    process.env.APP_ROOT!,
-    process.cwd(),
-    path.resolve(process.env.APP_ROOT!, '..'),
-  ]
+  // Only this app folder + cwd — never parent (avoids Cloak_Admin/.env flipping player role).
+  const roots = [process.env.APP_ROOT!, process.cwd()]
 
   for (const root of roots) {
     candidates.push(path.join(root, '.env'))
     candidates.push(path.join(root, 'cloak-runtime.env'))
   }
+
+  // Do NOT load .env.admin for the player app — it sets CLOAK_APP_ROLE=admin and
+  // Discord then gets redirect :19284 → "Invalid OAuth2 redirect_uri".
+  // Admin lives in the sibling Cloak_Admin folder (or `vite --mode admin`).
 
   return [...new Set(candidates.filter(Boolean))]
 }
@@ -72,23 +122,8 @@ function loadEnvFile() {
 
   for (const envPath of envFileCandidates()) {
     looked.push(envPath)
-    if (!fs.existsSync(envPath)) continue
-
-    const before = seen.size
-    const text = fs.readFileSync(envPath, 'utf8')
-    for (const line of text.split(/\r?\n/)) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      const eq = trimmed.indexOf('=')
-      if (eq <= 0) continue
-      const key = trimmed.slice(0, eq).trim().replace(/^\uFEFF/, '')
-      const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
-      if (!key || seen.has(key)) continue
-      process.env[key] = value
-      seen.add(key)
-    }
-
-    if (seen.size > before) {
+    const added = applyEnvFile(envPath, seen)
+    if (added > 0) {
       loadedAny = true
       console.log('[cloak] Loaded env from', envPath)
     }
@@ -125,22 +160,30 @@ if (process.platform === 'win32' && os.release().startsWith('6.1')) {
   app.disableHardwareAcceleration()
 }
 
-// Dev must not share userData / single-instance with packaged Cloak.exe,
-// or `npm run dev` silently quits and you keep using the release build (no .env).
-if (VITE_DEV_SERVER_URL) {
-  const devData = path.join(app.getPath('appData'), 'Cloak Desktop Dev')
-  app.setPath('userData', devData)
-  if (process.platform === 'win32') {
-    app.setAppUserModelId('com.cloak.app.dev')
+// Separate userData so User + Admin (and packaged vs dev) can run side by side.
+{
+  const role = isAdminApp() ? 'admin' : 'user'
+  const displayName = getAppDisplayName()
+  app.setName(displayName)
+  console.log(`[cloak] App role=${role} name=${displayName}`)
+
+  if (VITE_DEV_SERVER_URL) {
+    const folder = isAdminApp() ? 'Cloak Admin Dev' : 'Cloak Desktop Dev'
+    app.setPath('userData', path.join(app.getPath('appData'), folder))
+    if (process.platform === 'win32') app.setAppUserModelId(getAppUserModelId(true))
+  } else {
+    if (isAdminApp()) {
+      app.setPath('userData', path.join(app.getPath('appData'), 'Cloak Admin'))
+    }
+    if (process.platform === 'win32') app.setAppUserModelId(getAppUserModelId(false))
   }
-} else if (process.platform === 'win32') {
-  app.setAppUserModelId('com.cloak.app')
 }
 
-if (!app.requestSingleInstanceLock()) {
+// Packaged: one window only. Dev: skip lock so Vite Electron HMR restarts don't
+// immediately quit and tear down `npm run dev`.
+if (!VITE_DEV_SERVER_URL && !app.requestSingleInstanceLock()) {
   console.warn(
-    '[cloak] Another Cloak instance is already running — exiting this process. ' +
-      'Close Cloak Desktop (tray/taskbar) fully, then run npm run dev again.',
+    `[cloak] Another ${getAppDisplayName()} instance is already running — exiting this process.`,
   )
   app.quit()
   process.exit(0)
@@ -181,7 +224,7 @@ async function persistAuthResult(result: AuthResult): Promise<AuthResult> {
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: 'Cloak Desktop',
+    title: getAppDisplayName(),
     width: 1180,
     height: 740,
     minWidth: 960,
@@ -228,7 +271,13 @@ async function createWindow() {
     return { action: 'deny' }
   })
 
-  update(win)
+  // Store / Admin: skip GitHub portable updater (Store updates; Admin feed comes later).
+  const windowsStore = Boolean(
+    (process as NodeJS.Process & { windowsStore?: boolean }).windowsStore,
+  )
+  if (!windowsStore && !isAdminApp()) {
+    update(win)
+  }
 }
 
 app.whenReady().then(createWindow)
@@ -240,7 +289,8 @@ app.on('window-all-closed', () => {
 })
 
 app.on('second-instance', (_event, argv) => {
-  const deepLink = argv.find((arg) => arg.startsWith('cloak://'))
+  const protocol = getAppProtocol()
+  const deepLink = argv.find((arg) => arg.startsWith(`${protocol}://`))
   if (deepLink) {
     void handleAuthCallback(deepLink)
       .then(persistAuthResult)
@@ -263,10 +313,12 @@ app.on('activate', () => {
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('cloak', process.execPath, [path.resolve(process.argv[1])])
+    app.setAsDefaultProtocolClient(getAppProtocol(), process.execPath, [
+      path.resolve(process.argv[1]),
+    ])
   }
 } else {
-  app.setAsDefaultProtocolClient('cloak')
+  app.setAsDefaultProtocolClient(getAppProtocol())
 }
 
 ipcMain.handle('cloak:window-minimize', () => win?.minimize())

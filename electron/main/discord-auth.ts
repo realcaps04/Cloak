@@ -11,6 +11,7 @@ import {
   isDiscordAuthConfigured,
 } from './discord-config'
 import { checkGuildMembership } from './guild-membership'
+import { getAppDisplayName, getAppRole, getAuthPort } from './app-role'
 
 export type CloakUser = {
   id: string
@@ -40,14 +41,18 @@ export type MembershipWaitingPayload = {
   inviteUrl: string
 }
 
-const AUTH_PORT = 19283
 const MEMBERSHIP_POLL_MS = 4000
 const MEMBERSHIP_WAIT_MS = 5 * 60 * 1000
 
+function authPort() {
+  return getAuthPort()
+}
+
 function getRedirectUri() {
   const configured = getDiscordRedirectUri()
-  if (configured.includes(String(AUTH_PORT))) return configured
-  return `http://127.0.0.1:${AUTH_PORT}/callback`
+  const port = authPort()
+  if (configured.includes(String(port))) return configured
+  return `http://127.0.0.1:${port}/callback`
 }
 
 function inviteCodeFromUrl(inviteUrl: string) {
@@ -367,6 +372,9 @@ export function startDiscordAuth(options: StartAuthOptions = {}): Promise<AuthRe
   const inviteUrl = getDiscordInviteUrl()
   const guildName = getDiscordGuildName()
   const redirectUri = getRedirectUri()
+  console.log(
+    `[cloak] Discord OAuth start role=${getAppRole()} port=${authPort()} redirect_uri=${redirectUri}`,
+  )
 
   if (!isDiscordAuthConfigured()) {
     return Promise.resolve(
@@ -391,21 +399,21 @@ export function startDiscordAuth(options: StartAuthOptions = {}): Promise<AuthRe
         return
       }
 
-      const fullUrl = `http://127.0.0.1:${AUTH_PORT}${req.url}`
+      const fullUrl = `http://127.0.0.1:${authPort()}${req.url}`
 
       // Respond quickly so the browser tab isn't stuck while we poll membership
       res.writeHead(200, { 'Content-Type': 'text/html' })
       res.end(
         htmlPage(
-          'Cloak',
-          `<h1>Connected</h1><p>Return to Cloak. If you are not in ${guildName} yet, join in Discord — Cloak verifies in the background.</p>`,
+          getAppDisplayName(),
+          `<h1>Connected</h1><p>Return to ${getAppDisplayName()}. If you are not in ${guildName} yet, join in Discord — Cloak verifies in the background.</p>`,
         ),
       )
 
       void handleAuthCallback(fullUrl)
     })
 
-    authServer.listen(AUTH_PORT, '127.0.0.1', async () => {
+    authServer.listen(authPort(), '127.0.0.1', async () => {
       if (options.openInviteFirst) {
         await openDiscordInvite()
         // Brief pause so Discord can take focus before OAuth browser opens

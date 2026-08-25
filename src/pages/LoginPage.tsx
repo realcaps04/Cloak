@@ -18,6 +18,7 @@ const highlights = [
   { title: 'Instant alerts', desc: 'Admins know right away' },
 ]
 
+/** Player app login only — Cloak Desktop. */
 export function LoginPage() {
   const {
     loginWithDiscord,
@@ -58,8 +59,8 @@ export function LoginPage() {
           Join without <span className="text-signal">leaking IPs</span>
         </h1>
         <p className="mt-5 max-w-md text-base leading-relaxed text-mist">
-          Cloak keeps your join links inside the app. Access is limited to verified members of the
-          Cloak Discord community.
+          Cloak Desktop is for players. Join links stay inside the app. Access is limited to verified
+          members of the Cloak Discord community.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-2">
@@ -84,10 +85,12 @@ export function LoginPage() {
 
       <section className="animate-rise-delay flex items-center justify-center px-6 py-10 lg:border-l lg:border-line/70 lg:bg-panel/20 lg:px-10">
         <div className="panel-glow w-full max-w-md rounded-2xl border border-line bg-panel/80 p-8">
-          <h2 className="font-display text-center text-2xl font-bold text-snow">Sign in to Cloak</h2>
+          <h2 className="font-display text-center text-2xl font-bold text-snow">
+            Sign in to Cloak Desktop
+          </h2>
           <p className="mt-2 text-center text-sm text-mist">
-            Join <span className="text-snow">{guildName}</span>, authorize once, and Cloak takes you
-            home automatically.
+            Join <span className="text-snow">{guildName}</span>, authorize once, and Cloak Desktop
+            takes you home automatically.
           </p>
 
           <div className="mt-8 rounded-xl border border-signal/20 bg-signal/5 px-4 py-4">
@@ -194,8 +197,7 @@ export function LoginPage() {
           )}
 
           <p className="mt-6 text-center text-[11px] leading-relaxed text-mist/70">
-            Once Discord confirms you&apos;re in {guildName}, Cloak opens the home screen
-            automatically.
+            Once Discord confirms you&apos;re in {guildName}, Cloak Desktop opens your servers.
           </p>
         </div>
       </section>

@@ -1,9 +1,21 @@
-export function AmbientBackground() {
+export function AmbientBackground({ variant = 'user' }: { variant?: 'user' | 'admin' }) {
+  const isAdmin = variant === 'admin'
+
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      <div className="animate-drift absolute -left-24 -top-28 h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(circle,rgba(34,197,94,0.14),transparent_68%)] blur-2xl" />
-      <div className="animate-drift absolute -bottom-32 -right-20 h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,rgba(20,80,50,0.18),transparent_70%)] blur-2xl [animation-delay:-4s]" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,7,0.15),rgba(5,6,7,0.94))]" />
+      {isAdmin ? (
+        <>
+          <div className="animate-drift absolute -left-20 -top-24 h-[30rem] w-[30rem] rounded-full bg-[radial-gradient(circle,rgba(240,180,90,0.16),transparent_68%)] blur-2xl" />
+          <div className="animate-drift absolute -right-24 -bottom-28 h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(120,70,20,0.22),transparent_70%)] blur-2xl [animation-delay:-4s]" />
+          <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(12,10,8,0.2),rgba(5,6,7,0.95))]" />
+        </>
+      ) : (
+        <>
+          <div className="animate-drift absolute -left-24 -top-28 h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(circle,rgba(34,197,94,0.14),transparent_68%)] blur-2xl" />
+          <div className="animate-drift absolute -bottom-32 -right-20 h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,rgba(20,80,50,0.18),transparent_70%)] blur-2xl [animation-delay:-4s]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,7,0.15),rgba(5,6,7,0.94))]" />
+        </>
+      )}
       <div
         className="absolute inset-0 opacity-[0.04]"
         style={{

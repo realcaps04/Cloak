@@ -1,6 +1,7 @@
 import { ConvexHttpClient } from 'convex/browser'
 import { makeFunctionReference } from 'convex/server'
 import type { CloakUser } from './discord-auth'
+import { getAppRole } from './app-role'
 
 const upsertAndCreateSession = makeFunctionReference<
   'mutation',
@@ -13,6 +14,7 @@ const upsertAndCreateSession = makeFunctionReference<
     guildVerified: boolean
     guildId?: string
     guildName?: string
+    appRole?: 'user' | 'admin'
   },
   {
     token: string
@@ -112,6 +114,7 @@ export async function saveUserSession(user: CloakUser): Promise<PersistedSession
     guildVerified: user.guildVerified,
     guildId: user.guildId,
     guildName: user.guildName,
+    appRole: getAppRole(),
   })
 
   return {

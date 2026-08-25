@@ -33,6 +33,14 @@ function fixPreloadCjs(): Plugin {
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => {
   const webOnly = mode === 'web'
+  const isAdmin = mode === 'admin'
+
+  // Ensure Electron main inherits admin role (single-instance / userData / auth port).
+  if (isAdmin) {
+    process.env.CLOAK_APP_ROLE = 'admin'
+    process.env.VITE_CLOAK_APP_ROLE = 'admin'
+  }
+
   if (!webOnly) {
     rmSync('dist-electron', { recursive: true, force: true })
   }
@@ -48,6 +56,11 @@ export default defineConfig(({ command, mode }) => {
         '@': path.join(__dirname, 'src'),
       },
     },
+    define: isAdmin
+      ? {
+          'import.meta.env.VITE_CLOAK_APP_ROLE': JSON.stringify('admin'),
+        }
+      : undefined,
     plugins: [
       react(),
       tailwindcss(),
@@ -58,6 +71,12 @@ export default defineConfig(({ command, mode }) => {
               main: {
                 input: 'electron/main/index.ts',
                 plugins: [notBundle()],
+                vite: {
+                  define: {
+                    'process.env.CLOAK_APP_ROLE': JSON.stringify(isAdmin ? 'admin' : 'user'),
+                    'process.env.VITE_CLOAK_APP_ROLE': JSON.stringify(isAdmin ? 'admin' : 'user'),
+                  },
+                },
                 options: {
                   build: {
                     sourcemap,

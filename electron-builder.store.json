@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.cloak.app",
+  "productName": "Cloak Desktop",
+  "executableName": "CloakDesktop",
+  "asar": true,
+  "directories": {
+    "output": "C:/Users/ASUS/AppData/Local/cloak-store/${version}",
+    "buildResources": "build"
+  },
+  "icon": "build/icon.png",
+  "afterPack": "./scripts/afterPack.cjs",
+  "files": [
+    "dist-electron",
+    "dist"
+  ],
+  "protocols": [
+    {
+      "name": "Cloak Desktop",
+      "schemes": ["cloak"]
+    }
+  ],
+  "win": {
+    "icon": "build/icon.ico",
+    "signExecutable": false,
+    "target": [
+      {
+        "target": "appx",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "appx": {
+    "identityName": "EdisonBiju.CloakDesktop",
+    "publisher": "CN=AE822019-C1CE-418B-8CF9-9C72E2340D20",
+    "publisherDisplayName": "Edison Biju",
+    "applicationId": "CloakDesktop",
+    "displayName": "Cloak Desktop",
+    "languages": ["en-US"],
+    "showNameOnTiles": true,
+    "setBuildNumber": true
+  }
+}

@@ -1,3 +1,5 @@
+import { getDefaultRedirectUri, isAdminApp } from './app-role'
+
 function env(key: string, fallback = '') {
   return (process.env[key] ?? fallback).trim()
 }
@@ -15,7 +17,10 @@ export function getDiscordGuildName() {
 }
 
 export function getDiscordRedirectUri() {
-  return env('DISCORD_REDIRECT_URI', 'http://127.0.0.1:19283/callback')
+  if (isAdminApp()) {
+    return env('DISCORD_ADMIN_REDIRECT_URI') || getDefaultRedirectUri()
+  }
+  return env('DISCORD_REDIRECT_URI') || getDefaultRedirectUri()
 }
 
 export function getDiscordClientId() {

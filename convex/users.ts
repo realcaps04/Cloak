@@ -3,10 +3,16 @@ import { v } from 'convex/values'
 
 const SESSION_DAYS = 30
 
+const appRoleValidator = v.optional(v.union(v.literal('user'), v.literal('admin')))
+
 function makeSessionToken() {
   const bytes = new Uint8Array(32)
   crypto.getRandomValues(bytes)
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function resolveAppRole(appRole: 'user' | 'admin' | undefined): 'user' | 'admin' {
+  return appRole === 'admin' ? 'admin' : 'user'
 }
 
 /**
@@ -23,6 +29,7 @@ export const upsertAndCreateSession = mutation({
     guildVerified: v.boolean(),
     guildId: v.optional(v.string()),
     guildName: v.optional(v.string()),
+    appRole: appRoleValidator,
   },
   handler: async (ctx, args) => {
     if (!args.guildVerified) {
@@ -30,6 +37,7 @@ export const upsertAndCreateSession = mutation({
     }
 
     const now = Date.now()
+    const role = resolveAppRole(args.appRole)
     const existing = await ctx.db
       .query('users')
       .withIndex('by_discord_id', (q) => q.eq('discordId', args.discordId))
@@ -61,13 +69,16 @@ export const upsertAndCreateSession = mutation({
       })
     }
 
-    // Drop older sessions for this user (keep login fresh, one primary session)
+    // Only replace sessions for this app role so User + Admin can stay signed in together.
     const oldSessions = await ctx.db
       .query('sessions')
       .withIndex('by_discord_id', (q) => q.eq('discordId', args.discordId))
       .collect()
     for (const session of oldSessions) {
-      await ctx.db.delete(session._id)
+      const sessionRole = resolveAppRole(session.appRole)
+      if (sessionRole === role) {
+        await ctx.db.delete(session._id)
+      }
     }
 
     const token = makeSessionToken()
@@ -76,6 +87,7 @@ export const upsertAndCreateSession = mutation({
     await ctx.db.insert('sessions', {
       token,
       discordId: args.discordId,
+      appRole: role,
       createdAt: now,
       expiresAt,
       lastSeenAt: now,
