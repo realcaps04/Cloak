@@ -87,6 +87,27 @@ Also set `GOOGLE_CLIENT_ID` in [Convex Dashboard](https://dashboard.convex.dev/)
 
 OAuth consent screen: while in **Testing**, only Test users can sign in. For public hosting, publish the app (or add each tester).
 
+### Deploy website on Vercel
+
+1. In Vercel → Project → **Settings → Environment Variables**, add:
+
+| Name | Value | Environments |
+|------|--------|--------------|
+| `VITE_GOOGLE_CLIENT_ID` | your Google Client ID | Production, Preview |
+| `VITE_CONVEX_URL` | `https://sleek-shark-313.convex.cloud` | Production, Preview |
+
+`VITE_*` vars are baked in at **build** time. After adding them, click **Redeploy**.
+
+2. Build settings (or use the included `vercel.json`):
+   - **Build Command:** `npm run build:web`
+   - **Output Directory:** `dist`
+
+3. In Google Cloud, add your Vercel URL (example `https://cloak-xxx.vercel.app`):
+   - JavaScript origin: `https://your-app.vercel.app`
+   - Redirect URI: `https://your-app.vercel.app/google-callback.html`
+
+4. In Convex Dashboard, keep `GOOGLE_CLIENT_ID` set (same Client ID).
+
 ### How website auth works
 
 1. User opens the hosted site (or localhost)

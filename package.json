@@ -12,6 +12,7 @@
     "dev": "vite",
     "web": "vite --mode web --port 5174 --strictPort --open",
     "build": "vite build && electron-builder",
+    "build:web": "vite build --mode web",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "convex:dev": "convex dev",
