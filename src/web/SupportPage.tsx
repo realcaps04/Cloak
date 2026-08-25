@@ -51,12 +51,16 @@ const topics = [
         a: 'Sign in on the website, open Product, then use Download for Windows. Run Cloak.exe on Windows 10/11 x64.',
       },
       {
+        q: 'Where do I download Cloak Admin?',
+        a: 'On Product, use Download CloakAdmin.exe. It is a portable Windows x64 build for server owners and Server Admins — run the exe and sign in with Discord.',
+      },
+      {
         q: 'Windows SmartScreen blocks the installer',
         a: 'Click More info → Run anyway if you downloaded Cloak from the official GitHub release. The app is not code-signed yet in beta.',
       },
       {
         q: 'Cloak opens then closes immediately',
-        a: 'Reinstall from the latest release. If it still fails, delete %APPDATA%\\Cloak and open the app again, then sign in with Discord.',
+        a: 'Reinstall from the latest release. If it still fails, delete %APPDATA%\\Cloak (or %APPDATA%\\cloak-admin for Admin) and open the app again, then sign in with Discord.',
       },
     ],
   },

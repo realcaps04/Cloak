@@ -30,5 +30,12 @@
       }
     ],
     "artifactName": "CloakAdmin.${ext}"
-  }
+  },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "realcaps04",
+      "repo": "Cloak"
+    }
+  ]
 }

@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
 import { BetaBadge } from '@/components/BetaBadge'
 import { CloakIcon, CLOAK_APP_ICON_SRC } from '@/components/CloakLogo'
-import { fetchLatestCloakRelease, getCloakDownloadUrl } from '@/lib/web'
+import {
+  fetchLatestCloakAdminRelease,
+  fetchLatestCloakRelease,
+  getCloakAdminDownloadUrl,
+  getCloakDownloadUrl,
+} from '@/lib/web'
 import { AdminIcon, DiscordMark, FiveMMark, ShieldCheckIcon } from '@/web/WebsiteIcons'
 
 const userPoints = [
@@ -23,6 +28,13 @@ const installSteps = [
   'Join only the servers an admin grants you.',
 ]
 
+const adminInstallSteps = [
+  'Download CloakAdmin.exe (Windows x64).',
+  'Run the portable exe — no installer required.',
+  'Sign in with Discord as a Server Admin.',
+  'Add servers, invite roster, and grant player access.',
+]
+
 function WindowsIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -42,15 +54,21 @@ function DownloadIcon({ className }: { className?: string }) {
 
 export function ProductsPage() {
   const [downloadUrl, setDownloadUrl] = useState(getCloakDownloadUrl())
+  const [adminDownloadUrl, setAdminDownloadUrl] = useState(getCloakAdminDownloadUrl())
   const [version, setVersion] = useState<string | null>(null)
+  const [adminVersion, setAdminVersion] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    void fetchLatestCloakRelease().then((release) => {
-      if (cancelled) return
-      setDownloadUrl(release.downloadUrl)
-      setVersion(release.version === 'latest' ? null : release.version)
-    })
+    void Promise.all([fetchLatestCloakRelease(), fetchLatestCloakAdminRelease()]).then(
+      ([desktop, admin]) => {
+        if (cancelled) return
+        setDownloadUrl(desktop.downloadUrl)
+        setVersion(desktop.version === 'latest' ? null : desktop.version)
+        setAdminDownloadUrl(admin.downloadUrl)
+        setAdminVersion(admin.version === 'latest' ? null : admin.version)
+      },
+    )
     return () => {
       cancelled = true
     }
@@ -186,12 +204,16 @@ export function ProductsPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="font-gropled text-2xl font-bold text-snow">Cloak Admin</h2>
+                    <BetaBadge />
                   </div>
-                  <p className="mt-1 text-sm text-mist">Control panel for server owners</p>
+                  <p className="mt-1 text-sm text-mist">
+                    Control panel for server owners
+                    {adminVersion ? ` · v${adminVersion}` : ' · latest release'}
+                  </p>
                 </div>
               </div>
-              <span className="rounded-full border border-line bg-panel/80 px-3 py-1 text-[11px] font-semibold tracking-wide text-mist uppercase">
-                Coming next
+              <span className="rounded-full border border-signal/30 bg-signal/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-signal uppercase">
+                Download ready
               </span>
             </div>
           </div>
@@ -211,16 +233,40 @@ export function ProductsPage() {
                 </li>
               ))}
             </ul>
-            <button
-              type="button"
-              disabled
-              className="mt-8 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-full border border-line bg-panel/60 px-6 py-3 text-sm font-bold text-mist opacity-70"
-            >
-              Download unavailable
-            </button>
+
+            <div className="mt-8 rounded-2xl border border-line bg-ink/50 p-5">
+              <p className="text-xs font-semibold tracking-[0.14em] text-snow uppercase">
+                Install on your device
+              </p>
+              <ol className="mt-3 space-y-2">
+                {adminInstallSteps.map((step, index) => (
+                  <li key={step} className="flex gap-3 text-sm text-mist">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signal/15 text-xs font-bold text-signal">
+                      {index + 1}
+                    </span>
+                    <span className="pt-0.5">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <a
+                href={adminDownloadUrl}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-signal px-6 py-3 text-sm font-bold text-void transition hover:bg-signal-bright"
+              >
+                <DownloadIcon className="h-4 w-4" />
+                Download CloakAdmin.exe
+              </a>
+              <div className="inline-flex items-center gap-2 text-xs text-mist">
+                <WindowsIcon className="h-4 w-4 text-mist" />
+                Windows 10/11 · x64 · portable exe
+              </div>
+            </div>
+
             <p className="mt-5 text-xs leading-relaxed text-mist">
-              Cloak Admin is the next product. Server owners will manage access here while players
-              use Cloak Desktop.
+              Cloak Admin is for server owners and Server Admins. Players should download Cloak
+              Desktop instead.
             </p>
           </div>
         </article>
