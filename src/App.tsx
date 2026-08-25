@@ -1,5 +1,6 @@
 import { AuthProvider, useAuth } from '@/context/AuthContext'
 import { AmbientBackground } from '@/components/AmbientBackground'
+import { ForceUpdateModal } from '@/components/ForceUpdateModal'
 import { TitleBar } from '@/components/TitleBar'
 import { LoginPage } from '@/pages/LoginPage'
 import { HomePage } from '@/pages/HomePage'
@@ -24,6 +25,7 @@ function DesktopShell() {
       <div className="relative min-h-0 flex-1">
         {user ? <HomePage /> : <LoginPage />}
       </div>
+      <ForceUpdateModal />
     </div>
   )
 }

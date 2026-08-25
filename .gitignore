@@ -15,6 +15,7 @@ release
 *.local
 .env
 .env.local
+cloak-runtime.env
 
 # Convex local leftovers (generated API is committed for Electron)
 .convex

@@ -31,17 +31,50 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '../..')
 
 function envFileCandidates() {
+  const candidates: string[] = []
+
+  // Packaged / portable: secrets are baked into resources at build time.
+  try {
+    if (process.resourcesPath) {
+      candidates.push(path.join(process.resourcesPath, 'cloak-runtime.env'))
+    }
+  } catch {
+    // ignore
+  }
+
+  // Next to the running executable (portable folder / custom installs)
+  try {
+    const exeDir = path.dirname(app.getPath('exe'))
+    candidates.push(path.join(exeDir, 'cloak-runtime.env'))
+    candidates.push(path.join(exeDir, '.env'))
+  } catch {
+    // app path may not be ready yet
+  }
+
   const roots = [
     process.env.APP_ROOT!,
     process.cwd(),
     path.resolve(process.env.APP_ROOT!, '..'),
   ]
-  return [...new Set(roots.map((root) => path.join(root, '.env')))]
+
+  for (const root of roots) {
+    candidates.push(path.join(root, '.env'))
+    candidates.push(path.join(root, 'cloak-runtime.env'))
+  }
+
+  return [...new Set(candidates.filter(Boolean))]
 }
 
 function loadEnvFile() {
+  const looked: string[] = []
+  const seen = new Set<string>()
+  let loadedAny = false
+
   for (const envPath of envFileCandidates()) {
+    looked.push(envPath)
     if (!fs.existsSync(envPath)) continue
+
+    const before = seen.size
     const text = fs.readFileSync(envPath, 'utf8')
     for (const line of text.split(/\r?\n/)) {
       const trimmed = line.trim()
@@ -50,16 +83,35 @@ function loadEnvFile() {
       if (eq <= 0) continue
       const key = trimmed.slice(0, eq).trim().replace(/^\uFEFF/, '')
       const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
-      if (key) process.env[key] = value
+      if (!key || seen.has(key)) continue
+      process.env[key] = value
+      seen.add(key)
     }
-    console.log('[cloak] Loaded env from', envPath)
-    return envPath
+
+    if (seen.size > before) {
+      loadedAny = true
+      console.log('[cloak] Loaded env from', envPath)
+    }
   }
-  console.warn('[cloak] No .env found. Looked in:', envFileCandidates().join(' | '))
-  return null
+
+  if (!loadedAny) {
+    console.warn('[cloak] No env file found. Looked in:', looked.join(' | '))
+    return null
+  }
+
+  return 'merged'
 }
 
-loadEnvFile()
+// Load again after app is ready so resourcesPath / exe path resolve correctly.
+function loadEnvWhenReady() {
+  loadEnvFile()
+  if (app.isReady()) return
+  app.whenReady().then(() => {
+    loadEnvFile()
+  })
+}
+
+loadEnvWhenReady()
 
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')

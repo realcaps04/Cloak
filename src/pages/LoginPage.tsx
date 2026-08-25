@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { BetaBadge } from '@/components/BetaBadge'
 import { CloakBrand } from '@/components/CloakLogo'
@@ -32,6 +33,14 @@ export function LoginPage() {
     configMissing,
     community,
   } = useAuth()
+
+  const [isPackagedApp, setIsPackagedApp] = useState(false)
+
+  useEffect(() => {
+    void window.cloak?.getUpdateRuntimeInfo?.().then((info) => {
+      setIsPackagedApp(Boolean(info.packaged))
+    })
+  }, [])
 
   const guildName = community?.guildName ?? 'Cloak Community'
   const needsGuildJoin = errorCode === 'NOT_IN_GUILD'
@@ -143,9 +152,19 @@ export function LoginPage() {
 
           {bridgeReady && !discordReady && configMissing.length > 0 && (
             <p className="mt-4 text-center text-xs leading-relaxed text-warn">
-              Missing in <code className="text-snow">.env</code>:{' '}
-              {configMissing.join(', ')}. Save the file, then fully restart Cloak (Ctrl+C →{' '}
-              <code className="text-snow">npm run dev</code>).
+              {isPackagedApp ? (
+                <>
+                  This Cloak build is missing Discord config. Download the newest{' '}
+                  <span className="font-semibold text-snow">Cloak.exe</span> from the website Products
+                  page, replace this app, and open it again.
+                </>
+              ) : (
+                <>
+                  Missing in <code className="text-snow">.env</code>:{' '}
+                  {configMissing.join(', ')}. Save the file, then fully restart Cloak (Ctrl+C →{' '}
+                  <code className="text-snow">npm run dev</code>). Close any packaged Cloak.exe first.
+                </>
+              )}
             </p>
           )}
 
