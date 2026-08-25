@@ -20,6 +20,7 @@ export type GoogleWebUser = {
 
 type GoogleAuthValue = {
   user: GoogleWebUser | null
+  sessionToken: string | null
   loading: boolean
   busy: boolean
   error: string | null
@@ -143,6 +144,7 @@ function openGoogleIdTokenPopup(clientId: string): Promise<string> {
 
 export function GoogleAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<GoogleWebUser | null>(null)
+  const [sessionToken, setSessionToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -159,10 +161,18 @@ export function GoogleAuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         const session = await client().query(getGoogleSessionFn, { token })
-        if (!cancelled && session) setUser(session.user)
-        else if (!cancelled) localStorage.removeItem(SESSION_KEY)
+        if (!cancelled && session) {
+          setUser(session.user)
+          setSessionToken(token)
+        } else if (!cancelled) {
+          localStorage.removeItem(SESSION_KEY)
+          setSessionToken(null)
+        }
       } catch {
-        if (!cancelled) localStorage.removeItem(SESSION_KEY)
+        if (!cancelled) {
+          localStorage.removeItem(SESSION_KEY)
+          setSessionToken(null)
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -188,6 +198,7 @@ export function GoogleAuthProvider({ children }: { children: ReactNode }) {
       const idToken = await openGoogleIdTokenPopup(clientId)
       const result = await client().action(signInWithGoogleFn, { idToken })
       localStorage.setItem(SESSION_KEY, result.token)
+      setSessionToken(result.token)
       setUser(result.user)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Google sign-in failed'
@@ -207,12 +218,22 @@ export function GoogleAuthProvider({ children }: { children: ReactNode }) {
       void client().mutation(revokeGoogleSessionFn, { token }).catch(() => undefined)
     }
     localStorage.removeItem(SESSION_KEY)
+    setSessionToken(null)
     setUser(null)
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, busy, error, googleReady, signInWithGoogle, logout }),
-    [user, loading, busy, error, googleReady, signInWithGoogle, logout],
+    () => ({
+      user,
+      sessionToken,
+      loading,
+      busy,
+      error,
+      googleReady,
+      signInWithGoogle,
+      logout,
+    }),
+    [user, sessionToken, loading, busy, error, googleReady, signInWithGoogle, logout],
   )
 
   return <GoogleAuthContext.Provider value={value}>{children}</GoogleAuthContext.Provider>

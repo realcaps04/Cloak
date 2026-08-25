@@ -4,6 +4,7 @@ import { CloakIcon } from '@/components/CloakLogo'
 import { TermsPanel } from '@/components/TermsPanel'
 import { GoogleSignInButton } from '@/web/GoogleSignInButton'
 import { ProductsPage } from '@/web/ProductsPage'
+import { SupportPage } from '@/web/SupportPage'
 import { trustedLogos } from '@/web/TrustedLogos'
 import { useGoogleAuth } from '@/web/GoogleAuthContext'
 import {
@@ -16,7 +17,7 @@ import {
   whyPoints,
 } from '@/web/WebsiteIcons'
 
-type WebPage = 'home' | 'terms' | 'products'
+type WebPage = 'home' | 'terms' | 'products' | 'support'
 
 function scrollTo(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -26,12 +27,14 @@ function pathToPage(pathname: string): WebPage {
   const path = pathname.replace(/\/+$/, '').toLowerCase()
   if (path === '/products') return 'products'
   if (path === '/terms') return 'terms'
+  if (path === '/support') return 'support'
   return 'home'
 }
 
 function pageToPath(page: WebPage) {
   if (page === 'products') return '/products'
   if (page === 'terms') return '/terms'
+  if (page === 'support') return '/support'
   return '/'
 }
 
@@ -141,6 +144,13 @@ export function WebsiteHome() {
             >
               Terms
             </button>
+            <button
+              type="button"
+              onClick={() => navigate('support')}
+              className={page === 'support' ? 'text-snow' : 'hover:text-snow'}
+            >
+              Support
+            </button>
           </nav>
           <div className="justify-self-end">
             {user ? (
@@ -175,6 +185,8 @@ export function WebsiteHome() {
       )}
 
       {page === 'products' && user && <ProductsPage />}
+
+      {page === 'support' && <SupportPage />}
 
       {page === 'home' && (
         <main>
@@ -360,6 +372,11 @@ export function WebsiteHome() {
                   <li>
                     <button type="button" onClick={() => navigate('terms')} className="text-sm text-mist transition hover:text-snow">
                       Terms of use
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" onClick={() => navigate('support')} className="text-sm text-mist transition hover:text-snow">
+                      Support
                     </button>
                   </li>
                   <li>

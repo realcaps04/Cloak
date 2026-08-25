@@ -50,4 +50,33 @@ export default defineSchema({
   })
     .index('by_token', ['token'])
     .index('by_google_id', ['googleId']),
+
+  supportIssues: defineTable({
+    googleId: v.optional(v.string()),
+    email: v.string(),
+    name: v.string(),
+    category: v.union(
+      v.literal('install'),
+      v.literal('discord'),
+      v.literal('servers'),
+      v.literal('website'),
+      v.literal('other'),
+    ),
+    subject: v.string(),
+    description: v.string(),
+    discordUsername: v.optional(v.string()),
+    preferDiscordSupport: v.boolean(),
+    status: v.union(
+      v.literal('open'),
+      v.literal('in_progress'),
+      v.literal('resolved'),
+      v.literal('closed'),
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_google_id', ['googleId'])
+    .index('by_email', ['email'])
+    .index('by_status', ['status'])
+    .index('by_created', ['createdAt']),
 })
