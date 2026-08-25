@@ -110,28 +110,35 @@ OAuth consent screen: while in **Testing**, only Test users can sign in. For pub
 
 ### Publish Cloak User installer
 
-1. Build the desktop installer:
+In-app updates read **`latest.yml`**, not the GitHub release tag. The website shows the tag (`v0.1.1.3`); the desktop app only offers an update when `latest.yml` has a **higher semver** than the installed app and points at `Cloak.exe`.
+
+1. Bump `package.json` `version` to a normal semver (`0.1.1`, `0.1.2` — not `0.1.1.3`).
+2. Build:
 
 ```bash
 npm run build
 ```
 
-Windows installer lands at:
+Output folder:
 
-`C:\Users\ASUS\AppData\Local\cloak-release\<version>\Cloak.exe`
+`C:\Users\ASUS\AppData\Local\cloak-release\<version>\`
 
 (Built outside OneDrive to avoid Windows file-lock errors.)
 
-2. Upload that file to a GitHub Release (or any CDN).
+3. Create/edit the GitHub **Latest** release. Tag it the same as `package.json` (e.g. `v0.1.1`). Upload **both** files from that folder:
+   - `Cloak.exe`
+   - `latest.yml` (must match that exact exe — hash + `version:` field)
 
-3. Set on Vercel (and local `.env` if needed):
+   Remove stale assets like old `Cloak_0.1.0.exe` / `.blockmap` / outdated `latest.yml`.
+
+4. Optional website env:
 
 ```env
 VITE_CLOAK_DOWNLOAD_URL=https://github.com/realcaps04/Cloak/releases/latest/download/Cloak.exe
 VITE_CLOAK_APP_VERSION=
 ```
 
-4. Redeploy the website. The Products page **Download for Windows** button uses that URL.
+5. Redeploy the website if needed. Products download uses `/releases/latest/download/Cloak.exe`.
 
 ### How website auth works
 

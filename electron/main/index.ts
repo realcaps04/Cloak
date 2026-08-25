@@ -52,8 +52,10 @@ function loadEnvFile() {
       const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
       if (key) process.env[key] = value
     }
+    console.log('[cloak] Loaded env from', envPath)
     return envPath
   }
+  console.warn('[cloak] No .env found. Looked in:', envFileCandidates().join(' | '))
   return null
 }
 
@@ -71,11 +73,23 @@ if (process.platform === 'win32' && os.release().startsWith('6.1')) {
   app.disableHardwareAcceleration()
 }
 
-if (process.platform === 'win32') {
+// Dev must not share userData / single-instance with packaged Cloak.exe,
+// or `npm run dev` silently quits and you keep using the release build (no .env).
+if (VITE_DEV_SERVER_URL) {
+  const devData = path.join(app.getPath('appData'), 'Cloak Desktop Dev')
+  app.setPath('userData', devData)
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.cloak.app.dev')
+  }
+} else if (process.platform === 'win32') {
   app.setAppUserModelId('com.cloak.app')
 }
 
 if (!app.requestSingleInstanceLock()) {
+  console.warn(
+    '[cloak] Another Cloak instance is already running — exiting this process. ' +
+      'Close Cloak Desktop (tray/taskbar) fully, then run npm run dev again.',
+  )
   app.quit()
   process.exit(0)
 }

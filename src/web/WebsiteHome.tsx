@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { BetaBadge } from '@/components/BetaBadge'
 import { CloakIcon, CLOAK_APP_ICON_SRC } from '@/components/CloakLogo'
 import { TermsPanel } from '@/components/TermsPanel'
-import { fetchLatestCloakRelease, getCloakDownloadUrl } from '@/lib/web'
 import { GoogleSignInButton } from '@/web/GoogleSignInButton'
 import { ProductsPage } from '@/web/ProductsPage'
 import { SupportPage } from '@/web/SupportPage'
@@ -71,20 +70,6 @@ export function WebsiteHome() {
   const [page, setPage] = useState<WebPage>(() =>
     typeof window !== 'undefined' ? pathToPage(window.location.pathname) : 'home',
   )
-  const [downloadUrl, setDownloadUrl] = useState(getCloakDownloadUrl())
-  const [releaseVersion, setReleaseVersion] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    void fetchLatestCloakRelease().then((release) => {
-      if (cancelled) return
-      setDownloadUrl(release.downloadUrl)
-      setReleaseVersion(release.version === 'latest' ? null : release.version)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   function navigate(next: WebPage) {
     setPage(next)
@@ -264,33 +249,6 @@ export function WebsiteHome() {
                   <p className="mt-2 text-sm leading-relaxed text-mist">{item.body}</p>
                 </article>
               ))}
-            </div>
-
-            <div className="mt-10 flex flex-col items-center justify-between gap-5 border-t border-line/60 pt-10 sm:flex-row sm:items-end">
-              <div className="max-w-xl text-center sm:text-left">
-                <p className="text-xs font-semibold tracking-[0.18em] text-signal uppercase">
-                  Latest release
-                </p>
-                <h3 className="mt-2 font-gropled text-2xl font-bold text-snow">
-                  Download Cloak Desktop
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-mist">
-                  Get the newest Windows build
-                  {releaseVersion ? (
-                    <>
-                      {' '}
-                      (<span className="font-semibold text-snow">v{releaseVersion}</span>)
-                    </>
-                  ) : null}
-                  . Sign in on this site for Product access; the app itself uses Discord.
-                </p>
-              </div>
-              <a
-                href={downloadUrl}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-signal px-6 py-3 text-sm font-bold text-void transition hover:bg-signal-bright"
-              >
-                Download Cloak.exe
-              </a>
             </div>
           </section>
 

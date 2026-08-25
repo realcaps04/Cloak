@@ -69,7 +69,35 @@ export function ProductsPage() {
         </p>
       </div>
 
-      <div className="mt-14 grid gap-6 lg:grid-cols-2">
+      <div className="mt-10 flex flex-col items-center justify-between gap-5 rounded-[1.75rem] border border-line bg-panel/70 px-8 py-8 sm:flex-row sm:items-end">
+        <div className="max-w-xl text-center sm:text-left">
+          <p className="text-xs font-semibold tracking-[0.18em] text-signal uppercase">
+            Latest release
+          </p>
+          <h2 className="mt-2 font-gropled text-2xl font-bold text-snow">
+            Download Cloak Desktop
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-mist">
+            Get the newest Windows build
+            {version ? (
+              <>
+                {' '}
+                (<span className="font-semibold text-snow">v{version}</span>)
+              </>
+            ) : null}
+            . Sign in on this site for Product access; the app itself uses Discord.
+          </p>
+        </div>
+        <a
+          href={downloadUrl}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-signal px-6 py-3 text-sm font-bold text-void transition hover:bg-signal-bright"
+        >
+          <DownloadIcon className="h-4 w-4" />
+          Download Cloak.exe
+        </a>
+      </div>
+
+      <div className="mt-10 grid gap-6 lg:grid-cols-2">
         <article className="flex flex-col overflow-hidden rounded-[1.75rem] border border-line bg-panel/70">
           <div className="relative overflow-hidden border-b border-line bg-ink px-8 py-10">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.28),transparent_50%)]" />
