@@ -1,7 +1,7 @@
 {
   "name": "cloak",
   "productName": "Cloak Desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "FiveM server connector that keeps IP links inside the app.",
   "license": "UNLICENSED",
