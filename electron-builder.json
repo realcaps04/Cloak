@@ -1,36 +1,56 @@
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "appId": "com.cloak.app",
-  "productName": "Cloak",
+  "productName": "Cloak Desktop",
+  "executableName": "CloakDesktop",
   "asar": true,
   "directories": {
     "output": "C:/Users/ASUS/AppData/Local/cloak-release/${version}",
     "buildResources": "build"
   },
+  "icon": "build/icon.png",
+  "afterPack": "./scripts/afterPack.cjs",
   "files": [
     "dist-electron",
     "dist"
   ],
   "protocols": [
     {
-      "name": "Cloak",
+      "name": "Cloak Desktop",
       "schemes": ["cloak"]
     }
   ],
   "win": {
+    "icon": "build/icon.ico",
+    "signExecutable": false,
     "target": [
       {
-        "target": "nsis",
+        "target": "portable",
         "arch": ["x64"]
       }
     ],
-    "artifactName": "${productName}_${version}.${ext}"
+    "artifactName": "Cloak_${version}.${ext}"
   },
   "nsis": {
     "oneClick": false,
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
+    "allowElevation": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
     "deleteAppDataOnUninstall": false,
-    "shortcutName": "Cloak"
-  }
+    "shortcutName": "Cloak Desktop",
+    "uninstallDisplayName": "Cloak Desktop",
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
+    "installerHeaderIcon": "build/icon.ico",
+    "runAfterFinish": true
+  },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "realcaps04",
+      "repo": "Cloak"
+    }
+  ]
 }

@@ -44,9 +44,9 @@ export function DiscordLogo() {
 
 export function DesktopLogo() {
   return (
-    <LogoMark label="Desktop">
+    <LogoMark label="Cloak Desktop">
       <CloakMark className="h-7 w-7" />
-      <Wordmark>Desktop</Wordmark>
+      <Wordmark>Cloak Desktop</Wordmark>
     </LogoMark>
   )
 }

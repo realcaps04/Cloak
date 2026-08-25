@@ -1,20 +1,22 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { BetaBadge } from '@/components/BetaBadge'
 import { CloakIcon } from '@/components/CloakLogo'
 import { ServerCard } from '@/components/ServerCard'
 import { TermsPanel } from '@/components/TermsPanel'
+import { UpdatesPanel } from '@/components/UpdatesPanel'
 import { CLOAK_SERVERS } from '@/lib/servers'
 import { TERMS_SECTIONS, scrollToTermsSection } from '@/lib/terms'
 import { avatarUrl, displayName } from '@/lib/types'
 
-type NavId = 'servers' | 'support' | 'warnings' | 'penalties' | 'terms'
+type NavId = 'servers' | 'support' | 'warnings' | 'penalties' | 'terms' | 'updates'
 
 const NAV_ITEMS: { id: NavId; label: string }[] = [
   { id: 'servers', label: 'Servers' },
   { id: 'support', label: 'Support' },
   { id: 'warnings', label: 'Warnings' },
   { id: 'penalties', label: 'Penalties' },
+  { id: 'updates', label: 'Updates' },
   { id: 'terms', label: 'Terms' },
 ]
 
@@ -170,6 +172,7 @@ export function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeNav, setActiveNav] = useState<NavId>('servers')
   const [activeTermsSection, setActiveTermsSection] = useState<string | null>(null)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
 
   const handleJoin = useCallback(async (serverId: string) => {
     if (window.cloak?.joinServer) {
@@ -179,6 +182,13 @@ export function HomePage() {
       ok: false,
       message: 'Run Cloak as a desktop app to connect to servers.',
     }
+  }, [])
+
+  useEffect(() => {
+    const off = window.cloak?.onUpdateAvailable?.((info) => {
+      setUpdateAvailable(info.update)
+    })
+    return () => off?.()
   }, [])
 
   if (!user) return null
@@ -214,13 +224,16 @@ export function HomePage() {
                     <button
                       type="button"
                       onClick={() => setActiveNav(item.id)}
-                      className={`no-drag w-full rounded-lg px-3 py-2 text-left font-medium transition ${
+                      className={`no-drag flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-medium transition ${
                         active
                           ? 'bg-signal/10 text-signal'
                           : 'text-mist hover:bg-ink/60 hover:text-snow'
                       }`}
                     >
-                      {item.label}
+                      <span>{item.label}</span>
+                      {item.id === 'updates' && updateAvailable ? (
+                        <span className="h-2 w-2 rounded-full bg-signal" aria-label="Update available" />
+                      ) : null}
                     </button>
 
                     {item.id === 'terms' && activeNav === 'terms' && (
@@ -340,6 +353,12 @@ export function HomePage() {
             <EmptyPanel
               title="Penalties"
               body="You have nothing to pay. Outstanding penalties from server admins will show here."
+            />
+          )}
+          {activeNav === 'updates' && (
+            <UpdatesPanel
+              updateAvailable={updateAvailable}
+              onAvailability={(available) => setUpdateAvailable(available)}
             />
           )}
           {activeNav === 'terms' && <TermsPanel />}

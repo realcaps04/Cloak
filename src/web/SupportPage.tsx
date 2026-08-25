@@ -47,8 +47,8 @@ const topics = [
     title: 'Install & launch',
     items: [
       {
-        q: 'Where do I download Cloak User?',
-        a: 'Sign in on the website, open Product, then use Download for Windows. Run the NSIS installer (Cloak_*.exe) on Windows 10/11 x64.',
+        q: 'Where do I download Cloak Desktop?',
+        a: 'Sign in on the website, open Product, then use Download for Windows. Run Cloak_*.exe on Windows 10/11 x64.',
       },
       {
         q: 'Windows SmartScreen blocks the installer',
@@ -106,7 +106,7 @@ const topics = [
       },
       {
         q: 'I signed in with Google but cannot open Product',
-        a: 'Product appears only after Google sign-in on the website. Desktop play still requires the Cloak User app and Discord.',
+        a: 'Product appears only after Google sign-in on the website. Desktop play still requires Cloak Desktop and Discord.',
       },
     ],
   },
@@ -331,7 +331,7 @@ export function SupportPage() {
             href={DISCORD_INVITE}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-line bg-[#5865F2]/15 px-5 py-2.5 text-sm font-bold text-snow transition hover:border-[#5865F2]/50"
+            className="inline-flex items-center gap-2 rounded-full bg-[#5865F2] px-5 py-2.5 text-sm font-bold text-snow transition hover:brightness-110"
           >
             <DiscordMark className="h-4 w-4" />
             Discord support
@@ -440,7 +440,7 @@ export function SupportPage() {
                   href={DISCORD_INVITE}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-[#8ea1ff] transition hover:text-snow"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-[#5865F2] transition hover:text-[#7289da]"
                 >
                   <DiscordMark className="h-4 w-4" />
                   Open Cloak Discord
@@ -468,7 +468,7 @@ export function SupportPage() {
               href={DISCORD_INVITE}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-mist transition hover:border-signal/40 hover:text-snow"
+              className="inline-flex items-center gap-2 rounded-full bg-[#5865F2] px-5 py-2.5 text-sm font-bold text-snow transition hover:brightness-110"
             >
               <DiscordMark className="h-4 w-4" />
               Ask only on Discord
@@ -495,7 +495,7 @@ export function SupportPage() {
                         {statusLabel(issue.status)}
                       </span>
                       {issue.preferDiscordSupport ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#5865F2]/20 px-2.5 py-0.5 text-xs font-semibold text-[#b5c0ff]">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#5865F2] px-2.5 py-0.5 text-xs font-semibold text-snow">
                           <DiscordMark className="h-3 w-3" />
                           Discord
                         </span>

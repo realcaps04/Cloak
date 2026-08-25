@@ -115,7 +115,7 @@ async function persistAuthResult(result: AuthResult): Promise<AuthResult> {
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: 'Cloak Beta',
+    title: 'Cloak Desktop',
     width: 1180,
     height: 740,
     minWidth: 960,

@@ -39,6 +39,23 @@ export type DiscordConfigStatus = {
 
 export type JoinResult = { ok: boolean; message: string }
 
+export type UpdateAvailability = {
+  update: boolean
+  version: string
+  newVersion?: string
+}
+
+export type UpdateDownloadProgress = {
+  percent: number
+  transferred: number
+  total: number
+  bytesPerSecond: number
+}
+
+export type UpdateCheckResult =
+  | { updateInfo?: unknown; portable?: boolean }
+  | { message: string; error: Error; portable?: boolean }
+
 export type CloakApi = {
   minimize: () => Promise<void>
   maximize: () => Promise<void>
@@ -55,6 +72,16 @@ export type CloakApi = {
   onAuthResult: (callback: (result: AuthResult) => void) => () => void
   onMembershipWaiting: (callback: (payload: MembershipWaitingPayload) => void) => () => void
   joinServer: (serverId: string) => Promise<JoinResult>
+  getAppVersion?: () => Promise<string>
+  getUpdateRuntimeInfo?: () => Promise<{ packaged: boolean; portable: boolean; version: string }>
+  checkForUpdates?: () => Promise<UpdateCheckResult>
+  startUpdateDownload?: () => Promise<void | { ok: boolean; message?: string }>
+  cancelUpdateDownload?: () => Promise<void | { ok: boolean }>
+  quitAndInstall?: () => Promise<void | { ok: boolean; portable?: boolean }>
+  onUpdateAvailable?: (callback: (info: UpdateAvailability) => void) => () => void
+  onDownloadProgress?: (callback: (info: UpdateDownloadProgress) => void) => () => void
+  onUpdateDownloaded?: (callback: () => void) => () => void
+  onUpdateError?: (callback: (info: { message: string }) => void) => () => void
 }
 
 declare global {

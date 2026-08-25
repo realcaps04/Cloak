@@ -1,4 +1,11 @@
 import { ipcRenderer, contextBridge } from 'electron'
+import type { ProgressInfo } from 'electron-updater'
+
+type VersionInfo = {
+  update: boolean
+  version: string
+  newVersion?: string
+}
 
 export type CloakUser = {
   id: string
@@ -57,6 +64,33 @@ const cloak = {
   },
   joinServer: (serverId: string): Promise<{ ok: boolean; message: string }> =>
     ipcRenderer.invoke('cloak:join-server', serverId),
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('cloak:get-app-version'),
+  getUpdateRuntimeInfo: (): Promise<{ packaged: boolean; portable: boolean; version: string }> =>
+    ipcRenderer.invoke('cloak:update-runtime-info'),
+  checkForUpdates: () => ipcRenderer.invoke('check-update'),
+  startUpdateDownload: () => ipcRenderer.invoke('start-download'),
+  cancelUpdateDownload: () => ipcRenderer.invoke('cancel-download'),
+  quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+  onUpdateAvailable: (callback: (info: VersionInfo) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, info: VersionInfo) => callback(info)
+    ipcRenderer.on('update-can-available', listener)
+    return () => ipcRenderer.off('update-can-available', listener)
+  },
+  onDownloadProgress: (callback: (info: ProgressInfo) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, info: ProgressInfo) => callback(info)
+    ipcRenderer.on('download-progress', listener)
+    return () => ipcRenderer.off('download-progress', listener)
+  },
+  onUpdateDownloaded: (callback: () => void) => {
+    const listener = () => callback()
+    ipcRenderer.on('update-downloaded', listener)
+    return () => ipcRenderer.off('update-downloaded', listener)
+  },
+  onUpdateError: (callback: (info: { message: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, info: { message: string }) => callback(info)
+    ipcRenderer.on('update-error', listener)
+    return () => ipcRenderer.off('update-error', listener)
+  },
 }
 
 contextBridge.exposeInMainWorld('cloak', cloak)

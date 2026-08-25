@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BetaBadge } from '@/components/BetaBadge'
-import { CloakIcon } from '@/components/CloakLogo'
+import { CloakIcon, CLOAK_APP_ICON_SRC } from '@/components/CloakLogo'
 import { TermsPanel } from '@/components/TermsPanel'
 import { GoogleSignInButton } from '@/web/GoogleSignInButton'
 import { ProductsPage } from '@/web/ProductsPage'
@@ -212,10 +212,20 @@ export function WebsiteHome() {
             <p className="text-center text-xs tracking-[0.2em] text-mist uppercase">
               Built for protected FiveM communities
             </p>
-            <div className="mt-6 overflow-hidden">
-              <div className="animate-marquee flex w-max items-center gap-16 px-8">
-                {[...trustedLogos, ...trustedLogos].map(({ id, Logo }, index) => (
-                  <Logo key={`${id}-${index}`} />
+            <div className="relative mt-6 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
+              <div className="animate-marquee flex w-max items-center">
+                {[0, 1].map((copy) => (
+                  <ul
+                    key={copy}
+                    className="flex shrink-0 items-center gap-16 pr-16"
+                    aria-hidden={copy === 1}
+                  >
+                    {trustedLogos.map(({ id, Logo }) => (
+                      <li key={`${copy}-${id}`}>
+                        <Logo />
+                      </li>
+                    ))}
+                  </ul>
                 ))}
               </div>
             </div>
@@ -246,7 +256,7 @@ export function WebsiteHome() {
             <div className="relative overflow-hidden rounded-[2rem] border border-line bg-ink p-10">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(34,197,94,0.32),transparent_45%),radial-gradient(circle_at_70%_80%,rgba(21,128,61,0.28),transparent_50%)]" />
               <img
-                src="/cloak_app_icon.png"
+                src={CLOAK_APP_ICON_SRC}
                 alt=""
                 className="relative mx-auto h-64 w-64 object-contain drop-shadow-[0_0_40px_rgba(34,197,94,0.35)]"
               />

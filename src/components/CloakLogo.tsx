@@ -1,6 +1,11 @@
-export const CLOAK_ICON_SRC = '/cloak-icon.png'
-export const CLOAK_APP_ICON_SRC = '/cloak_app_icon.png'
-export const CLOAK_BRAND_SRC = '/cloak-brand.jpg'
+import cloakAppIcon from '@/assets/cloak_app_icon.png'
+import cloakMarkIcon from '@/assets/cloak-icon.png'
+import cloakBrand from '@/assets/cloak-brand.jpg'
+
+/** Bundled assets — work in Electron file:// and on the website. */
+export const CLOAK_ICON_SRC = cloakMarkIcon
+export const CLOAK_APP_ICON_SRC = cloakAppIcon
+export const CLOAK_BRAND_SRC = cloakBrand
 
 type CloakIconProps = {
   size?: 'sm' | 'md' | 'lg'

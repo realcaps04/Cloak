@@ -42,6 +42,7 @@ export default defineConfig(({ command, mode }) => {
   const sourcemap = isServe || !!process.env.VSCODE_DEBUG
 
   return {
+    base: webOnly ? '/' : './',
     resolve: {
       alias: {
         '@': path.join(__dirname, 'src'),

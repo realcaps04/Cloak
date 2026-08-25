@@ -1,5 +1,5 @@
 import { BetaBadge } from '@/components/BetaBadge'
-import { CloakIcon } from '@/components/CloakLogo'
+import { CloakIcon, CLOAK_APP_ICON_SRC } from '@/components/CloakLogo'
 import { getCloakAppVersion, getCloakDownloadUrl } from '@/lib/web'
 import { AdminIcon, DiscordMark, FiveMMark, ShieldCheckIcon } from '@/web/WebsiteIcons'
 
@@ -18,7 +18,7 @@ const adminPoints = [
 const installSteps = [
   'Download the Windows installer (x64).',
   'Run Cloak_*.exe and complete setup.',
-  'Open Cloak and sign in with Discord.',
+  'Open Cloak Desktop and sign in with Discord.',
   'Join only the servers an admin grants you.',
 ]
 
@@ -65,7 +65,7 @@ export function ProductsPage() {
                 <CloakIcon size="lg" />
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="font-gropled text-2xl font-bold text-snow">Cloak User</h2>
+                    <h2 className="font-gropled text-2xl font-bold text-snow">Cloak Desktop</h2>
                     <BetaBadge />
                   </div>
                   <p className="mt-1 text-sm text-mist">Desktop app for players · v{version}</p>
@@ -79,7 +79,7 @@ export function ProductsPage() {
 
           <div className="flex flex-1 flex-col p-8">
             <p className="text-sm leading-relaxed text-mist">
-              Install Cloak on your PC, sign in with Discord, and join protected FiveM servers
+              Install Cloak Desktop on your PC, sign in with Discord, and join protected FiveM servers
               without pasting IPs into chat or clipboard.
             </p>
             <ul className="mt-6 space-y-3">
@@ -134,7 +134,7 @@ export function ProductsPage() {
             <div className="relative flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-line bg-panel-2 shadow-[0_0_28px_rgba(52,211,153,0.15)]">
-                  <img src="/cloak_app_icon.png" alt="" className="h-full w-full object-cover opacity-90" />
+                  <img src={CLOAK_APP_ICON_SRC} alt="" className="h-full w-full object-cover opacity-90" />
                   <div className="absolute inset-0 bg-gradient-to-br from-transparent to-ink/50" />
                   <span className="absolute bottom-1 right-1 rounded bg-signal px-1 text-[9px] font-bold text-void">
                     ADM
@@ -177,7 +177,7 @@ export function ProductsPage() {
             </button>
             <p className="mt-5 text-xs leading-relaxed text-mist">
               Cloak Admin is the next product. Server owners will manage access here while players
-              use Cloak User.
+              use Cloak Desktop.
             </p>
           </div>
         </article>
