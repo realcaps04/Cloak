@@ -12,9 +12,12 @@
     "dev": "vite",
     "build": "vite build && electron-builder",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy"
   },
   "dependencies": {
+    "convex": "^1.45.0",
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {

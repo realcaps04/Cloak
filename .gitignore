@@ -16,6 +16,10 @@ release
 .env
 .env.local
 
+# Convex local leftovers (generated API is committed for Electron)
+.convex
+
+
 # Editor directories and files
 .vscode/.debug.env
 .idea

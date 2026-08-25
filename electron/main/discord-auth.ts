@@ -1,6 +1,16 @@
 import http from 'node:http'
-import { shell } from 'electron'
+import { shell, BrowserWindow } from 'electron'
 import { randomBytes } from 'node:crypto'
+import {
+  getDiscordClientId,
+  getDiscordClientSecret,
+  getDiscordGuildId,
+  getDiscordGuildName,
+  getDiscordInviteUrl,
+  getDiscordRedirectUri,
+  isDiscordAuthConfigured,
+} from './discord-config'
+import { checkGuildMembership } from './guild-membership'
 
 export type CloakUser = {
   id: string
@@ -8,16 +18,53 @@ export type CloakUser = {
   globalName: string | null
   avatar: string | null
   discriminator: string
+  guildVerified: boolean
+  guildId?: string
+  guildName?: string
 }
 
-type AuthResult = { ok: true; user: CloakUser } | { ok: false; error: string }
+export type AuthErrorCode =
+  | 'NOT_CONFIGURED'
+  | 'NOT_IN_GUILD'
+  | 'CANCELLED'
+  | 'INVALID_RESPONSE'
+  | 'UNKNOWN'
+
+export type AuthResult =
+  | { ok: true; user: CloakUser }
+  | { ok: false; error: string; code: AuthErrorCode; inviteUrl?: string }
+
+export type MembershipWaitingPayload = {
+  message: string
+  guildName: string
+  inviteUrl: string
+}
 
 const AUTH_PORT = 19283
-const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI ?? `http://127.0.0.1:${AUTH_PORT}/callback`
+const MEMBERSHIP_POLL_MS = 4000
+const MEMBERSHIP_WAIT_MS = 5 * 60 * 1000
+
+function getRedirectUri() {
+  const configured = getDiscordRedirectUri()
+  if (configured.includes(String(AUTH_PORT))) return configured
+  return `http://127.0.0.1:${AUTH_PORT}/callback`
+}
+
+function inviteCodeFromUrl(inviteUrl: string) {
+  try {
+    const parsed = new URL(inviteUrl)
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    return parts[parts.length - 1] ?? ''
+  } catch {
+    return ''
+  }
+}
 
 let authServer: http.Server | null = null
 let pendingState: string | null = null
 let pendingResolve: ((result: AuthResult) => void) | null = null
+let membershipPollTimer: ReturnType<typeof setTimeout> | null = null
+let membershipWaitDeadline = 0
 
 function htmlPage(title: string, body: string) {
   return `<!doctype html>
@@ -35,16 +82,32 @@ function htmlPage(title: string, body: string) {
         color: #e8eaed;
         font-family: Segoe UI, sans-serif;
       }
-      .box { text-align: center; padding: 2rem; }
+      .box { text-align: center; padding: 2rem; max-width: 28rem; }
       h1 { font-size: 1.4rem; margin: 0 0 .5rem; }
-      p { opacity: .7; margin: 0; }
+      p { opacity: .7; margin: 0; line-height: 1.5; }
+      a {
+        display: inline-block;
+        margin-top: 1rem;
+        color: #22c55e;
+        text-decoration: none;
+        font-weight: 600;
+      }
     </style>
   </head>
   <body><div class="box">${body}</div></body>
 </html>`
 }
 
+function clearMembershipPoll() {
+  if (membershipPollTimer) {
+    clearTimeout(membershipPollTimer)
+    membershipPollTimer = null
+  }
+  membershipWaitDeadline = 0
+}
+
 export function stopAuthServer() {
+  clearMembershipPoll()
   if (authServer) {
     authServer.close()
     authServer = null
@@ -53,9 +116,153 @@ export function stopAuthServer() {
   pendingResolve = null
 }
 
+function emitWaiting(payload: MembershipWaitingPayload) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('cloak:membership-waiting', payload)
+  }
+}
+
+function settle(result: AuthResult) {
+  clearMembershipPoll()
+  pendingResolve?.(result)
+  pendingResolve = null
+  pendingState = null
+  if (authServer) {
+    authServer.close()
+    authServer = null
+  }
+
+  if (result.ok) {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
+    }
+  }
+}
+
+function authFailure(
+  error: string,
+  code: AuthErrorCode,
+  inviteUrl?: string,
+): AuthResult {
+  return inviteUrl ? { ok: false, error, code, inviteUrl } : { ok: false, error, code }
+}
+
+async function fetchDiscordProfile(accessToken: string) {
+  const userRes = await fetch('https://discord.com/api/users/@me', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  if (!userRes.ok) {
+    throw new Error('Could not load your Discord profile.')
+  }
+
+  return (await userRes.json()) as {
+    id: string
+    username: string
+    global_name: string | null
+    avatar: string | null
+    discriminator: string
+  }
+}
+
+function toCloakUser(
+  user: Awaited<ReturnType<typeof fetchDiscordProfile>>,
+  guildId: string,
+  guildName: string,
+): CloakUser {
+  return {
+    id: user.id,
+    username: user.username,
+    globalName: user.global_name,
+    avatar: user.avatar,
+    discriminator: user.discriminator,
+    guildVerified: true,
+    guildId,
+    guildName,
+  }
+}
+
+async function waitForMembership(
+  accessToken: string,
+  profile: Awaited<ReturnType<typeof fetchDiscordProfile>>,
+): Promise<CloakUser> {
+  const inviteUrl = getDiscordInviteUrl()
+  const guildName = getDiscordGuildName()
+
+  emitWaiting({
+    message: `Waiting for you to join ${guildName}. Cloak will continue automatically.`,
+    guildName,
+    inviteUrl,
+  })
+
+  membershipWaitDeadline = Date.now() + MEMBERSHIP_WAIT_MS
+
+  return new Promise((resolve, reject) => {
+    const tick = async () => {
+      if (Date.now() > membershipWaitDeadline) {
+        reject(
+          Object.assign(new Error(`Timed out waiting for ${guildName} membership.`), {
+            code: 'NOT_IN_GUILD' as AuthErrorCode,
+            inviteUrl,
+          }),
+        )
+        return
+      }
+
+      const membership = await checkGuildMembership(accessToken)
+      if (membership.isMember) {
+        resolve(toCloakUser(profile, membership.guildId, membership.guildName))
+        return
+      }
+
+      if (membership.reason === 'API_ERROR') {
+        reject(new Error(membership.message))
+        return
+      }
+
+      emitWaiting({
+        message: `Still waiting… join ${guildName} in Discord. Cloak checks every few seconds.`,
+        guildName,
+        inviteUrl,
+      })
+
+      membershipPollTimer = setTimeout(() => {
+        void tick()
+      }, MEMBERSHIP_POLL_MS)
+    }
+
+    void tick()
+  })
+}
+
+async function completeLoginFromAccessToken(accessToken: string): Promise<CloakUser> {
+  const profile = await fetchDiscordProfile(accessToken)
+  const membership = await checkGuildMembership(accessToken)
+
+  if (membership.isMember) {
+    return toCloakUser(profile, membership.guildId, membership.guildName)
+  }
+
+  if (membership.reason === 'GUILD_NOT_CONFIGURED' || membership.reason === 'API_ERROR') {
+    const err = new Error(membership.message) as Error & {
+      code: AuthErrorCode
+      inviteUrl?: string
+    }
+    err.code = 'UNKNOWN'
+    err.inviteUrl = membership.inviteUrl
+    throw err
+  }
+
+  // Not in server yet — keep token and poll in background until they join
+  return waitForMembership(accessToken, profile)
+}
+
 async function exchangeCode(code: string): Promise<CloakUser> {
-  const clientId = process.env.DISCORD_CLIENT_ID
-  const clientSecret = process.env.DISCORD_CLIENT_SECRET
+  const clientId = getDiscordClientId()
+  const clientSecret = getDiscordClientSecret()
+  const redirectUri = getRedirectUri()
 
   if (!clientId || !clientSecret) {
     throw new Error('Discord is not configured. Add credentials to your .env file.')
@@ -66,7 +273,7 @@ async function exchangeCode(code: string): Promise<CloakUser> {
     client_secret: clientSecret,
     grant_type: 'authorization_code',
     code,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
   })
 
   const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
@@ -80,50 +287,7 @@ async function exchangeCode(code: string): Promise<CloakUser> {
   }
 
   const tokenJson = (await tokenRes.json()) as { access_token: string }
-  const userRes = await fetch('https://discord.com/api/users/@me', {
-    headers: { Authorization: `Bearer ${tokenJson.access_token}` },
-  })
-
-  if (!userRes.ok) {
-    throw new Error('Could not load your Discord profile.')
-  }
-
-  const user = (await userRes.json()) as {
-    id: string
-    username: string
-    global_name: string | null
-    avatar: string | null
-    discriminator: string
-  }
-
-  const guildId = process.env.DISCORD_GUILD_ID
-  if (guildId) {
-    const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
-      headers: { Authorization: `Bearer ${tokenJson.access_token}` },
-    })
-    if (!guildsRes.ok) {
-      throw new Error('Could not verify Discord server membership.')
-    }
-    const guilds = (await guildsRes.json()) as Array<{ id: string }>
-    if (!guilds.some((g) => g.id === guildId)) {
-      throw new Error('You must join the Cloak Discord server before signing in.')
-    }
-  }
-
-  return {
-    id: user.id,
-    username: user.username,
-    globalName: user.global_name,
-    avatar: user.avatar,
-    discriminator: user.discriminator,
-  }
-}
-
-function settle(result: AuthResult) {
-  pendingResolve?.(result)
-  pendingResolve = null
-  pendingState = null
-  stopAuthServer()
+  return completeLoginFromAccessToken(tokenJson.access_token)
 }
 
 export async function handleAuthCallback(url: string): Promise<AuthResult> {
@@ -134,40 +298,75 @@ export async function handleAuthCallback(url: string): Promise<AuthResult> {
     const error = parsed.searchParams.get('error')
 
     if (error) {
-      const result: AuthResult = { ok: false, error: 'Discord login was cancelled.' }
+      const result = authFailure('Discord login was cancelled.', 'CANCELLED')
       settle(result)
       return result
     }
 
     if (!code || !state || state !== pendingState) {
-      const result: AuthResult = { ok: false, error: 'Invalid Discord login response.' }
+      const result = authFailure('Invalid Discord login response.', 'INVALID_RESPONSE')
       settle(result)
       return result
     }
 
+    // Keep pendingResolve alive during membership polling
     const user = await exchangeCode(code)
     const result: AuthResult = { ok: true, user }
     settle(result)
     return result
   } catch (error) {
-    const result: AuthResult = {
-      ok: false,
-      error: error instanceof Error ? error.message : 'Discord login failed',
-    }
+    const typed = error as Error & { code?: AuthErrorCode; inviteUrl?: string }
+    const result = authFailure(
+      typed.message || 'Discord login failed',
+      typed.code ?? 'UNKNOWN',
+      typed.inviteUrl,
+    )
     settle(result)
     return result
   }
 }
 
-export function startDiscordAuth(): Promise<AuthResult> {
-  const clientId = process.env.DISCORD_CLIENT_ID
-  const clientSecret = process.env.DISCORD_CLIENT_SECRET
+/** Open Discord app (preferred) or website and jump to the Cloak invite/server. */
+export async function openDiscordInvite() {
+  const inviteUrl = getDiscordInviteUrl()
+  const code = inviteCodeFromUrl(inviteUrl)
+  const guildId = getDiscordGuildId()
 
-  if (!clientId || !clientSecret) {
-    return Promise.resolve({
-      ok: false,
-      error: 'Discord is not set up yet. Copy .env.example to .env and add your Discord app keys.',
-    })
+  const candidates = [
+    code ? `discord://-/invite/${code}` : '',
+    guildId ? `discord://-/channels/${guildId}` : '',
+    inviteUrl,
+  ].filter(Boolean)
+
+  for (const url of candidates) {
+    try {
+      await shell.openExternal(url)
+      return
+    } catch {
+      // try next candidate
+    }
+  }
+}
+
+type StartAuthOptions = {
+  /** Open Discord invite/server first, then OAuth for background verification */
+  openInviteFirst?: boolean
+}
+
+export function startDiscordAuth(options: StartAuthOptions = {}): Promise<AuthResult> {
+  const clientId = getDiscordClientId()
+  const inviteUrl = getDiscordInviteUrl()
+  const guildName = getDiscordGuildName()
+  const redirectUri = getRedirectUri()
+
+  if (!isDiscordAuthConfigured()) {
+    return Promise.resolve(
+      authFailure(
+        'Discord is not set up yet. Add Client ID and Client Secret to your .env file.',
+        'NOT_CONFIGURED',
+        inviteUrl,
+      ),
+    )
   }
 
   stopAuthServer()
@@ -184,22 +383,30 @@ export function startDiscordAuth(): Promise<AuthResult> {
       }
 
       const fullUrl = `http://127.0.0.1:${AUTH_PORT}${req.url}`
-      const result = await handleAuthCallback(fullUrl)
 
-      if (result.ok) {
-        res.writeHead(200, { 'Content-Type': 'text/html' })
-        res.end(htmlPage('Cloak', '<h1>You are in</h1><p>You can close this tab and return to Cloak.</p>'))
-      } else {
-        res.writeHead(400, { 'Content-Type': 'text/html' })
-        res.end(htmlPage('Cloak', `<h1>Login failed</h1><p>${result.error}</p>`))
-      }
+      // Respond quickly so the browser tab isn't stuck while we poll membership
+      res.writeHead(200, { 'Content-Type': 'text/html' })
+      res.end(
+        htmlPage(
+          'Cloak',
+          `<h1>Connected</h1><p>Return to Cloak. If you are not in ${guildName} yet, join in Discord — Cloak verifies in the background.</p>`,
+        ),
+      )
+
+      void handleAuthCallback(fullUrl)
     })
 
     authServer.listen(AUTH_PORT, '127.0.0.1', async () => {
+      if (options.openInviteFirst) {
+        await openDiscordInvite()
+        // Brief pause so Discord can take focus before OAuth browser opens
+        await new Promise((r) => setTimeout(r, 900))
+      }
+
       const params = new URLSearchParams({
         client_id: clientId,
         response_type: 'code',
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: redirectUri,
         scope: 'identify guilds',
         state: pendingState!,
         prompt: 'consent',
@@ -210,13 +417,18 @@ export function startDiscordAuth(): Promise<AuthResult> {
     })
 
     authServer.on('error', () => {
-      settle({ ok: false, error: 'Could not start the local Discord login helper.' })
+      settle(authFailure('Could not start the local Discord login helper.', 'UNKNOWN'))
     })
 
     setTimeout(() => {
       if (pendingResolve) {
-        settle({ ok: false, error: 'Discord login timed out. Please try again.' })
+        settle(authFailure('Discord login timed out. Please try again.', 'UNKNOWN'))
       }
-    }, 5 * 60 * 1000)
+    }, MEMBERSHIP_WAIT_MS + 60_000)
   })
+}
+
+/** Join Cloak community in Discord, then verify membership and sign in. */
+export function joinCommunityAndVerify(): Promise<AuthResult> {
+  return startDiscordAuth({ openInviteFirst: true })
 }

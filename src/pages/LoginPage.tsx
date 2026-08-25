@@ -1,4 +1,7 @@
 import { useAuth } from '@/context/AuthContext'
+import { BetaBadge } from '@/components/BetaBadge'
+import { CloakBrand } from '@/components/CloakLogo'
+import { FeatureTag } from '@/components/FeatureTag'
 
 function DiscordGlyph({ className }: { className?: string }) {
   return (
@@ -8,64 +11,154 @@ function DiscordGlyph({ className }: { className?: string }) {
   )
 }
 
+const highlights = [
+  { title: 'Private', desc: 'Keep your IP hidden' },
+  { title: 'Secure', desc: 'Join with confidence' },
+  { title: 'Instant alerts', desc: 'Admins know right away' },
+]
+
 export function LoginPage() {
-  const { loginWithDiscord, previewAsGuest, busy, error, discordReady } = useAuth()
+  const {
+    loginWithDiscord,
+    joinCommunityAndVerify,
+    busy,
+    waitingForMembership,
+    waitingMessage,
+    error,
+    errorCode,
+    discordReady,
+    community,
+  } = useAuth()
+
+  const guildName = community?.guildName ?? 'Cloak Community'
+  const needsGuildJoin = errorCode === 'NOT_IN_GUILD'
+  const inProgress = busy || waitingForMembership
 
   return (
-    <main className="relative z-10 flex min-h-[calc(100vh-2.25rem)] flex-col items-center justify-center px-6 pb-16">
-      <div className="animate-rise mx-auto w-full max-w-lg text-center">
-        <p className="mb-5 text-xs font-semibold tracking-[0.35em] text-signal uppercase">
-          Upcoming 2026
-        </p>
-        <h1 className="font-display text-glow text-[4.5rem] leading-none font-extrabold tracking-tight sm:text-[5.5rem]">
-          Cloak
+    <main className="relative z-10 grid min-h-[calc(100vh-2.25rem)] lg:grid-cols-[1fr_1.05fr]">
+      <section className="animate-rise flex flex-col justify-center px-8 py-10 lg:px-12">
+        <div className="flex items-end gap-3">
+          <CloakBrand />
+          <BetaBadge size="md" className="mb-2" />
+        </div>
+
+        <h1 className="font-display text-glow mt-8 max-w-lg text-4xl leading-[1.05] font-extrabold tracking-tight sm:text-5xl">
+          Join without <span className="text-signal">leaking IPs</span>
         </h1>
-        <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-mist">
-          Join without leaking IPs. FiveM links stay inside the app — if someone tries to share
-          them out, admins get alerted.
+        <p className="mt-5 max-w-md text-base leading-relaxed text-mist">
+          Cloak keeps your join links inside the app. Access is limited to verified members of the
+          Cloak Discord community.
         </p>
-      </div>
 
-      <div className="animate-rise-delay mt-12 w-full max-w-sm space-y-3">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void loginWithDiscord()}
-          className="no-drag group flex w-full items-center justify-center gap-3 rounded-xl bg-[#5865F2] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#4752c4] disabled:cursor-wait disabled:opacity-70"
-        >
-          <DiscordGlyph className="h-5 w-5" />
-          {busy ? 'Waiting for Discord…' : 'Continue with Discord'}
-        </button>
+        <div className="mt-8 flex flex-wrap gap-2">
+          <FeatureTag label="FiveM" />
+          <FeatureTag label="Security" />
+          <FeatureTag label="Desktop" />
+          <FeatureTag label="Discord verified" />
+        </div>
 
-        {!discordReady && (
-          <p className="text-center text-xs leading-relaxed text-mist/80">
-            Discord keys are not in `.env` yet — use preview mode to explore the UI, then plug in
-            your Discord app when ready.
+        <div className="mt-10 grid gap-3 sm:grid-cols-3">
+          {highlights.map((item) => (
+            <div
+              key={item.title}
+              className="rounded-xl border border-line bg-panel/50 px-4 py-3 panel-glow"
+            >
+              <p className="text-sm font-semibold text-snow">{item.title}</p>
+              <p className="mt-1 text-xs text-mist">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="animate-rise-delay flex items-center justify-center px-6 py-10 lg:border-l lg:border-line/70 lg:bg-panel/20 lg:px-10">
+        <div className="panel-glow w-full max-w-md rounded-2xl border border-line bg-panel/80 p-8">
+          <h2 className="font-display text-center text-2xl font-bold text-snow">Sign in to Cloak</h2>
+          <p className="mt-2 text-center text-sm text-mist">
+            Join <span className="text-snow">{guildName}</span>, authorize once, and Cloak takes you
+            home automatically.
           </p>
-        )}
 
-        <button
-          type="button"
-          onClick={previewAsGuest}
-          className="no-drag w-full rounded-xl border border-line bg-panel/60 px-5 py-3 text-sm font-medium text-snow/90 transition hover:border-signal/30 hover:bg-panel"
-        >
-          Preview the app
-        </button>
+          <div className="mt-8 rounded-xl border border-signal/20 bg-signal/5 px-4 py-4">
+            <p className="text-xs font-semibold tracking-wide text-signal uppercase">
+              Step 1 — Join & verify
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-mist">
+              Opens Discord (app or website) to {guildName}, then verifies membership in the
+              background.
+            </p>
 
-        {error && (
-          <div className="rounded-xl border border-warn/30 bg-warn/10 px-4 py-3 text-left text-sm text-warn">
-            {error}
+            <button
+              type="button"
+              disabled={inProgress || !discordReady}
+              onClick={() => void joinCommunityAndVerify()}
+              className="no-drag mt-4 flex w-full items-center justify-center gap-3 rounded-xl border border-signal-bright/60 bg-signal px-5 py-3.5 text-sm font-bold text-void shadow-[0_0_24px_rgba(34,197,94,0.45)] transition hover:border-signal-bright hover:bg-signal-bright hover:shadow-[0_0_32px_rgba(52,211,153,0.55)] disabled:cursor-not-allowed disabled:border-signal/40 disabled:bg-signal disabled:text-void/90 disabled:opacity-100 disabled:saturate-75 disabled:shadow-[0_0_12px_rgba(34,197,94,0.2)]"
+            >
+              {waitingForMembership ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-void/20 border-t-void" />
+                  Waiting for membership…
+                </>
+              ) : busy ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-void/20 border-t-void" />
+                  Opening Discord…
+                </>
+              ) : (
+                `Join ${guildName}`
+              )}
+            </button>
+
+            {waitingMessage && (
+              <p className="mt-3 text-[11px] leading-relaxed text-signal-dim">{waitingMessage}</p>
+            )}
           </div>
-        )}
-      </div>
 
-      <div className="animate-rise-delay mt-16 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] tracking-[0.18em] text-mist/70 uppercase">
-        <span>FiveM</span>
-        <span className="h-1 w-1 rounded-full bg-mist/40" />
-        <span>Security</span>
-        <span className="h-1 w-1 rounded-full bg-mist/40" />
-        <span>Desktop</span>
-      </div>
+          <div className="mt-4 rounded-xl border border-line bg-ink/50 px-4 py-3">
+            <p className="text-xs font-semibold tracking-wide text-mist uppercase">
+              Already in the server?
+            </p>
+            <button
+              type="button"
+              disabled={inProgress || !discordReady}
+              onClick={() => void loginWithDiscord()}
+              className="no-drag mt-3 flex w-full items-center justify-center gap-3 rounded-xl border border-[#7289da] bg-[#5865F2] px-5 py-3.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(88,101,242,0.45)] transition hover:border-[#8ea1ff] hover:bg-[#4752c4] hover:shadow-[0_0_28px_rgba(88,101,242,0.55)] disabled:cursor-not-allowed disabled:border-[#5865F2]/60 disabled:bg-[#5865F2] disabled:text-white disabled:opacity-100 disabled:saturate-75 disabled:shadow-[0_0_10px_rgba(88,101,242,0.25)]"
+            >
+              <DiscordGlyph className="h-5 w-5" />
+              {busy && !waitingForMembership ? 'Checking membership…' : 'Check Discord membership'}
+            </button>
+          </div>
+
+          {!discordReady && (
+            <p className="mt-4 text-center text-xs leading-relaxed text-mist/80">
+              Add Discord Client ID and Client Secret to `.env`, then restart the app.
+            </p>
+          )}
+
+          {error && (
+            <div className="mt-4 rounded-xl border border-warn/30 bg-warn/10 px-4 py-3 text-left text-sm text-warn">
+              <p className="font-medium">
+                {needsGuildJoin ? 'Membership not detected yet' : 'Sign-in failed'}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed opacity-90">{error}</p>
+              {needsGuildJoin && (
+                <button
+                  type="button"
+                  disabled={inProgress || !discordReady}
+                  onClick={() => void joinCommunityAndVerify()}
+                  className="no-drag mt-3 text-xs font-semibold text-signal underline-offset-2 hover:underline"
+                >
+                  Try Join {guildName} again →
+                </button>
+              )}
+            </div>
+          )}
+
+          <p className="mt-6 text-center text-[11px] leading-relaxed text-mist/70">
+            Once Discord confirms you&apos;re in {guildName}, Cloak opens the home screen
+            automatically.
+          </p>
+        </div>
+      </section>
     </main>
   )
 }

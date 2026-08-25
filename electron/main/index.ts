@@ -4,8 +4,22 @@ import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs'
 import { update } from './update'
-import { startDiscordAuth, handleAuthCallback, stopAuthServer } from './discord-auth'
-import type { CloakUser } from './discord-auth'
+import {
+  startDiscordAuth,
+  handleAuthCallback,
+  stopAuthServer,
+  openDiscordInvite,
+  joinCommunityAndVerify,
+  type AuthResult,
+} from './discord-auth'
+import { joinProtectedServer } from './join-server'
+import { getDiscordCommunity, isDiscordAuthConfigured } from './discord-config'
+import { restoreUserSession, revokeUserSession, saveUserSession } from './convex-client'
+import {
+  clearStoredSessionToken,
+  loadStoredSessionToken,
+  saveStoredSessionToken,
+} from './session-store'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -53,13 +67,32 @@ let win: BrowserWindow | null = null
 const preload = path.join(__dirname, '../preload/index.mjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
-function sendAuthResult(payload: { ok: true; user: CloakUser } | { ok: false; error: string }) {
+function sendAuthResult(payload: AuthResult) {
   win?.webContents.send('cloak:auth-result', payload)
+}
+
+/** Persist Discord login to Convex users + sessions tables. */
+async function persistAuthResult(result: AuthResult): Promise<AuthResult> {
+  if (!result.ok) return result
+
+  try {
+    const persisted = await saveUserSession(result.user)
+    saveStoredSessionToken(persisted.token, persisted.expiresAt)
+    return { ok: true, user: persisted.user }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Could not save your session to Convex.'
+    return {
+      ok: false,
+      error: `Logged in with Discord, but Convex save failed: ${message}`,
+      code: 'UNKNOWN',
+    }
+  }
 }
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: 'Cloak',
+    title: 'Cloak Beta',
     width: 1180,
     height: 740,
     minWidth: 960,
@@ -72,7 +105,7 @@ async function createWindow() {
       symbolColor: '#C8CDD5',
       height: 36,
     },
-    icon: path.join(process.env.VITE_PUBLIC!, 'favicon.ico'),
+    icon: path.join(process.env.VITE_PUBLIC!, 'cloak-icon.png'),
     webPreferences: {
       preload,
       contextIsolation: true,
@@ -110,7 +143,9 @@ app.on('window-all-closed', () => {
 app.on('second-instance', (_event, argv) => {
   const deepLink = argv.find((arg) => arg.startsWith('cloak://'))
   if (deepLink) {
-    void handleAuthCallback(deepLink).then(sendAuthResult)
+    void handleAuthCallback(deepLink)
+      .then(persistAuthResult)
+      .then(sendAuthResult)
   }
   if (win) {
     if (win.isMinimized()) win.restore()
@@ -145,13 +180,65 @@ ipcMain.handle('cloak:window-close', () => win?.close())
 
 ipcMain.handle('cloak:discord-login', async () => {
   try {
-    return await startDiscordAuth()
+    return await persistAuthResult(await startDiscordAuth())
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Discord login failed'
-    return { ok: false as const, error: message }
+    return { ok: false as const, error: message, code: 'UNKNOWN' as const }
   }
 })
 
-ipcMain.handle('cloak:discord-configured', () => {
-  return Boolean(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET)
+ipcMain.handle('cloak:join-and-verify', async () => {
+  try {
+    return await persistAuthResult(await joinCommunityAndVerify())
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not join and verify'
+    return { ok: false as const, error: message, code: 'UNKNOWN' as const }
+  }
+})
+
+ipcMain.handle('cloak:restore-session', async () => {
+  try {
+    const stored = loadStoredSessionToken()
+    if (!stored) return { ok: false as const }
+
+    const restored = await restoreUserSession(stored.token)
+    if (!restored) {
+      clearStoredSessionToken()
+      return { ok: false as const }
+    }
+
+    saveStoredSessionToken(restored.token, restored.expiresAt)
+    return { ok: true as const, user: restored.user }
+  } catch {
+    clearStoredSessionToken()
+    return { ok: false as const }
+  }
+})
+
+ipcMain.handle('cloak:logout', async () => {
+  const stored = loadStoredSessionToken()
+  if (stored?.token) {
+    try {
+      await revokeUserSession(stored.token)
+    } catch {
+      // still clear local session
+    }
+  }
+  clearStoredSessionToken()
+  return { ok: true as const }
+})
+
+ipcMain.handle('cloak:discord-configured', () => isDiscordAuthConfigured())
+
+ipcMain.handle('cloak:discord-community', () => getDiscordCommunity())
+
+ipcMain.handle('cloak:open-discord-invite', () => openDiscordInvite())
+
+ipcMain.handle('cloak:join-server', async (_event, serverId: string) => {
+  try {
+    return await joinProtectedServer(serverId)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not connect to server'
+    return { ok: false as const, message }
+  }
 })

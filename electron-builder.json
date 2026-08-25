@@ -4,7 +4,8 @@
   "productName": "Cloak",
   "asar": true,
   "directories": {
-    "output": "release/${version}"
+    "output": "release/${version}",
+    "buildResources": "build"
   },
   "files": [
     "dist-electron",

@@ -6,23 +6,53 @@ export type CloakUser = {
   globalName: string | null
   avatar: string | null
   discriminator: string
+  guildVerified?: boolean
+  guildId?: string
+  guildName?: string
 }
+
+export type AuthErrorCode =
+  | 'NOT_CONFIGURED'
+  | 'NOT_IN_GUILD'
+  | 'CANCELLED'
+  | 'INVALID_RESPONSE'
+  | 'UNKNOWN'
 
 export type AuthResult =
   | { ok: true; user: CloakUser }
-  | { ok: false; error: string }
+  | { ok: false; error: string; code?: AuthErrorCode; inviteUrl?: string }
+
+export type MembershipWaitingPayload = {
+  message: string
+  guildName: string
+  inviteUrl: string
+}
 
 const cloak = {
   minimize: () => ipcRenderer.invoke('cloak:window-minimize'),
   maximize: () => ipcRenderer.invoke('cloak:window-maximize'),
   close: () => ipcRenderer.invoke('cloak:window-close'),
   discordLogin: (): Promise<AuthResult> => ipcRenderer.invoke('cloak:discord-login'),
+  joinAndVerify: (): Promise<AuthResult> => ipcRenderer.invoke('cloak:join-and-verify'),
+  restoreSession: (): Promise<AuthResult | { ok: false }> =>
+    ipcRenderer.invoke('cloak:restore-session'),
+  logout: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('cloak:logout'),
   isDiscordConfigured: (): Promise<boolean> => ipcRenderer.invoke('cloak:discord-configured'),
+  getDiscordCommunity: () => ipcRenderer.invoke('cloak:discord-community'),
+  openDiscordInvite: () => ipcRenderer.invoke('cloak:open-discord-invite'),
   onAuthResult: (callback: (result: AuthResult) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, result: AuthResult) => callback(result)
     ipcRenderer.on('cloak:auth-result', listener)
     return () => ipcRenderer.off('cloak:auth-result', listener)
   },
+  onMembershipWaiting: (callback: (payload: MembershipWaitingPayload) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: MembershipWaitingPayload) =>
+      callback(payload)
+    ipcRenderer.on('cloak:membership-waiting', listener)
+    return () => ipcRenderer.off('cloak:membership-waiting', listener)
+  },
+  joinServer: (serverId: string): Promise<{ ok: boolean; message: string }> =>
+    ipcRenderer.invoke('cloak:join-server', serverId),
 }
 
 contextBridge.exposeInMainWorld('cloak', cloak)
@@ -60,7 +90,7 @@ function useLoading() {
   height: 42px;
   border-radius: 50%;
   border: 2px solid rgba(232, 234, 237, 0.12);
-  border-top-color: #7CFFB2;
+  border-top-color: #22C55E;
   animation: cloak-spin 0.9s linear infinite;
 }
 @keyframes cloak-spin { to { transform: rotate(360deg); } }

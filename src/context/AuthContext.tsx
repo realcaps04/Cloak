@@ -7,17 +7,22 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { clearSession, loadSession, saveSession } from '@/lib/session'
-import type { CloakUser } from '@/lib/types'
+import { clearSession, saveSession } from '@/lib/session'
+import type { AuthErrorCode, CloakUser, DiscordCommunity } from '@/lib/types'
 
 type AuthContextValue = {
   user: CloakUser | null
   loading: boolean
   busy: boolean
+  waitingForMembership: boolean
+  waitingMessage: string | null
   error: string | null
+  errorCode: AuthErrorCode | null
   discordReady: boolean
+  community: DiscordCommunity | null
   loginWithDiscord: () => Promise<void>
-  previewAsGuest: () => void
+  joinCommunityAndVerify: () => Promise<void>
+  openDiscordInvite: () => Promise<void>
   logout: () => void
   clearError: () => void
 }
@@ -28,69 +33,139 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CloakUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [waitingForMembership, setWaitingForMembership] = useState(false)
+  const [waitingMessage, setWaitingMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [errorCode, setErrorCode] = useState<AuthErrorCode | null>(null)
   const [discordReady, setDiscordReady] = useState(false)
+  const [community, setCommunity] = useState<DiscordCommunity | null>(null)
+
+  const applyAuthFailure = useCallback((result: { error: string; code?: AuthErrorCode }) => {
+    setWaitingForMembership(false)
+    setWaitingMessage(null)
+    setError(result.error)
+    setErrorCode(result.code ?? 'UNKNOWN')
+  }, [])
+
+  const applyAuthSuccess = useCallback((nextUser: CloakUser) => {
+    saveSession(nextUser)
+    setUser(nextUser)
+    setWaitingForMembership(false)
+    setWaitingMessage(null)
+    setError(null)
+    setErrorCode(null)
+  }, [])
 
   useEffect(() => {
-    setUser(loadSession())
-    setLoading(false)
+    let cancelled = false
 
-    void window.cloak?.isDiscordConfigured().then(setDiscordReady)
+    async function boot() {
+      void window.cloak?.isDiscordConfigured().then(setDiscordReady)
+      void window.cloak?.getDiscordCommunity().then(setCommunity)
 
-    const unsubscribe = window.cloak?.onAuthResult((result) => {
+      try {
+        const restored = await window.cloak?.restoreSession()
+        if (!cancelled && restored?.ok) {
+          applyAuthSuccess(restored.user)
+        } else if (!cancelled) {
+          clearSession()
+          setUser(null)
+        }
+      } catch {
+        if (!cancelled) {
+          clearSession()
+          setUser(null)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void boot()
+
+    const unsubscribeAuth = window.cloak?.onAuthResult((result) => {
       setBusy(false)
       if (result.ok) {
-        saveSession(result.user)
-        setUser(result.user)
-        setError(null)
+        applyAuthSuccess(result.user)
       } else {
-        setError(result.error)
+        applyAuthFailure(result)
       }
     })
 
-    return () => unsubscribe?.()
-  }, [])
+    const unsubscribeWaiting = window.cloak?.onMembershipWaiting((payload) => {
+      setWaitingForMembership(true)
+      setWaitingMessage(payload.message)
+      setError(null)
+      setErrorCode(null)
+    })
+
+    return () => {
+      cancelled = true
+      unsubscribeAuth?.()
+      unsubscribeWaiting?.()
+    }
+  }, [applyAuthFailure, applyAuthSuccess])
+
+  const runAuth = useCallback(
+    async (mode: 'login' | 'join') => {
+      setError(null)
+      setErrorCode(null)
+      setBusy(true)
+      setWaitingForMembership(mode === 'join')
+      setWaitingMessage(
+        mode === 'join'
+          ? 'Opening Discord… authorize Cloak, then we verify membership automatically.'
+          : null,
+      )
+
+      try {
+        if (!window.cloak) {
+          setError('Cloak desktop bridge is not available. Run the app with npm run dev.')
+          setErrorCode('UNKNOWN')
+          setBusy(false)
+          setWaitingForMembership(false)
+          setWaitingMessage(null)
+          return
+        }
+
+        const result =
+          mode === 'join' ? await window.cloak.joinAndVerify() : await window.cloak.discordLogin()
+
+        if (result.ok) {
+          applyAuthSuccess(result.user)
+        } else {
+          applyAuthFailure(result)
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Discord login failed')
+        setErrorCode('UNKNOWN')
+        setWaitingForMembership(false)
+        setWaitingMessage(null)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [applyAuthFailure, applyAuthSuccess],
+  )
 
   const loginWithDiscord = useCallback(async () => {
-    setError(null)
-    setBusy(true)
-    try {
-      if (!window.cloak) {
-        setError('Cloak desktop bridge is not available. Run the app with npm run dev.')
-        setBusy(false)
-        return
-      }
+    await runAuth('login')
+  }, [runAuth])
 
-      const result = await window.cloak.discordLogin()
-      if (result.ok) {
-        saveSession(result.user)
-        setUser(result.user)
-      } else {
-        setError(result.error)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Discord login failed')
-    } finally {
-      setBusy(false)
-    }
-  }, [])
+  const joinCommunityAndVerify = useCallback(async () => {
+    await runAuth('join')
+  }, [runAuth])
 
-  const previewAsGuest = useCallback(() => {
-    const demo: CloakUser = {
-      id: 'preview',
-      username: 'operator',
-      globalName: 'Preview Operator',
-      avatar: null,
-      discriminator: '0',
-    }
-    saveSession(demo)
-    setUser(demo)
-    setError(null)
+  const openDiscordInvite = useCallback(async () => {
+    await window.cloak?.openDiscordInvite()
   }, [])
 
   const logout = useCallback(() => {
+    void window.cloak?.logout()
     clearSession()
     setUser(null)
+    setWaitingForMembership(false)
+    setWaitingMessage(null)
   }, [])
 
   const value = useMemo(
@@ -98,14 +173,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       busy,
+      waitingForMembership,
+      waitingMessage,
       error,
+      errorCode,
       discordReady,
+      community,
       loginWithDiscord,
-      previewAsGuest,
+      joinCommunityAndVerify,
+      openDiscordInvite,
       logout,
-      clearError: () => setError(null),
+      clearError: () => {
+        setError(null)
+        setErrorCode(null)
+      },
     }),
-    [user, loading, busy, error, discordReady, loginWithDiscord, previewAsGuest, logout],
+    [
+      user,
+      loading,
+      busy,
+      waitingForMembership,
+      waitingMessage,
+      error,
+      errorCode,
+      discordReady,
+      community,
+      loginWithDiscord,
+      joinCommunityAndVerify,
+      openDiscordInvite,
+      logout,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -4,14 +4,16 @@
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
 
-  --color-void: #070809;
-  --color-ink: #0c0e11;
-  --color-panel: #111418;
-  --color-line: #1c2229;
-  --color-mist: #9aa3af;
-  --color-snow: #e8eaed;
-  --color-signal: #7cffb2;
-  --color-signal-dim: #3d9f6e;
+  --color-void: #050607;
+  --color-ink: #0a0c0e;
+  --color-panel: #101316;
+  --color-panel-2: #14181c;
+  --color-line: #1e252b;
+  --color-mist: #8b939e;
+  --color-snow: #f3f4f6;
+  --color-signal: #22c55e;
+  --color-signal-bright: #34d399;
+  --color-signal-dim: #15803d;
   --color-warn: #f0b45a;
 }
 
@@ -46,7 +48,7 @@
   }
 
   * {
-    scrollbar-color: #3a424c transparent;
+    scrollbar-color: #2f3944 transparent;
   }
 
   *::-webkit-scrollbar {
@@ -56,7 +58,7 @@
 
   *::-webkit-scrollbar-thumb {
     border-radius: 999px;
-    background: #3a424c;
+    background: #2f3944;
   }
 }
 
@@ -74,7 +76,13 @@
   }
 
   .text-glow {
-    text-shadow: 0 0 40px rgba(124, 255, 178, 0.25);
+    text-shadow: 0 0 48px rgba(34, 197, 94, 0.28);
+  }
+
+  .panel-glow {
+    box-shadow:
+      0 0 0 1px rgba(34, 197, 94, 0.08),
+      0 24px 60px -32px rgba(0, 0, 0, 0.85);
   }
 
   .animate-rise {

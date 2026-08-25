@@ -6,7 +6,12 @@ export function loadSession(): CloakUser | null {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return null
-    return JSON.parse(raw) as CloakUser
+    const user = JSON.parse(raw) as CloakUser
+    if (user.id === 'preview' || user.guildVerified === false) {
+      clearSession()
+      return null
+    }
+    return user
   } catch {
     return null
   }
