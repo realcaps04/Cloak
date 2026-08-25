@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_GOOGLE_CLIENT_ID?: string
   readonly VITE_CONVEX_URL?: string
+  readonly VITE_CLOAK_DOWNLOAD_URL?: string
+  readonly VITE_CLOAK_APP_VERSION?: string
 }
 
 declare module '*.md?raw' {

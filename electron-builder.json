@@ -4,7 +4,7 @@
   "productName": "Cloak",
   "asar": true,
   "directories": {
-    "output": "release/${version}",
+    "output": "C:/Users/ASUS/AppData/Local/cloak-release/${version}",
     "buildResources": "build"
   },
   "files": [

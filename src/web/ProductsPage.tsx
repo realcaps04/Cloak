@@ -1,5 +1,6 @@
 import { BetaBadge } from '@/components/BetaBadge'
 import { CloakIcon } from '@/components/CloakLogo'
+import { getCloakAppVersion, getCloakDownloadUrl } from '@/lib/web'
 import { AdminIcon, DiscordMark, FiveMMark, ShieldCheckIcon } from '@/web/WebsiteIcons'
 
 const userPoints = [
@@ -14,7 +15,34 @@ const adminPoints = [
   { label: 'Keep endpoints off public channels', Icon: FiveMMark },
 ]
 
+const installSteps = [
+  'Download the Windows installer (x64).',
+  'Run Cloak_*.exe and complete setup.',
+  'Open Cloak and sign in with Discord.',
+  'Join only the servers an admin grants you.',
+]
+
+function WindowsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M3 5.5 10.5 4.4v7.1H3V5.5Zm8.2-1.3L21 3v8.5h-9.8V4.2ZM3 13.5h7.5V20.6L3 19.5v-6Zm8.2 0H21V21l-9.8-1.4v-6.1Z" />
+    </svg>
+  )
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M12 4v10M8 10l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 18h14" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function ProductsPage() {
+  const downloadUrl = getCloakDownloadUrl()
+  const version = getCloakAppVersion()
+
   return (
     <main className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pt-20">
       <div className="max-w-2xl">
@@ -40,19 +68,19 @@ export function ProductsPage() {
                     <h2 className="font-gropled text-2xl font-bold text-snow">Cloak User</h2>
                     <BetaBadge />
                   </div>
-                  <p className="mt-1 text-sm text-mist">Desktop app for players</p>
+                  <p className="mt-1 text-sm text-mist">Desktop app for players · v{version}</p>
                 </div>
               </div>
               <span className="rounded-full border border-signal/30 bg-signal/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-signal uppercase">
-                Available
+                Download ready
               </span>
             </div>
           </div>
 
           <div className="flex flex-1 flex-col p-8">
             <p className="text-sm leading-relaxed text-mist">
-              Sign in with Discord, see only the servers you are granted, and join FiveM without
-              pasting IPs into chat or clipboard.
+              Install Cloak on your PC, sign in with Discord, and join protected FiveM servers
+              without pasting IPs into chat or clipboard.
             </p>
             <ul className="mt-6 space-y-3">
               {userPoints.map(({ label, Icon }) => (
@@ -64,9 +92,38 @@ export function ProductsPage() {
                 </li>
               ))}
             </ul>
-            <p className="mt-8 text-xs leading-relaxed text-mist">
-              Download and run the Cloak desktop app on Windows. Website Google sign-in is for the
-              public site only — the desktop app uses Discord.
+
+            <div className="mt-8 rounded-2xl border border-line bg-ink/50 p-5">
+              <p className="text-xs font-semibold tracking-[0.14em] text-snow uppercase">Install on your device</p>
+              <ol className="mt-3 space-y-2">
+                {installSteps.map((step, index) => (
+                  <li key={step} className="flex gap-3 text-sm text-mist">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signal/15 text-xs font-bold text-signal">
+                      {index + 1}
+                    </span>
+                    <span className="pt-0.5">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <a
+                href={downloadUrl}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-signal px-6 py-3 text-sm font-bold text-void transition hover:bg-signal-bright"
+              >
+                <DownloadIcon className="h-4 w-4" />
+                Download for Windows
+              </a>
+              <div className="inline-flex items-center gap-2 text-xs text-mist">
+                <WindowsIcon className="h-4 w-4 text-mist" />
+                Windows 10/11 · x64 · NSIS installer
+              </div>
+            </div>
+
+            <p className="mt-5 text-xs leading-relaxed text-mist">
+              Website Google sign-in is for this site only. The desktop app uses Discord membership
+              to verify you before showing servers.
             </p>
           </div>
         </article>
@@ -111,9 +168,16 @@ export function ProductsPage() {
                 </li>
               ))}
             </ul>
-            <p className="mt-8 text-xs leading-relaxed text-mist">
-              Cloak Admin is the next product in the ecosystem. Server owners and staff will manage
-              access from here while players stay on Cloak User.
+            <button
+              type="button"
+              disabled
+              className="mt-8 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-full border border-line bg-panel/60 px-6 py-3 text-sm font-bold text-mist opacity-70"
+            >
+              Download unavailable
+            </button>
+            <p className="mt-5 text-xs leading-relaxed text-mist">
+              Cloak Admin is the next product. Server owners will manage access here while players
+              use Cloak User.
             </p>
           </div>
         </article>
