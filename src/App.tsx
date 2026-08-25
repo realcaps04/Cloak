@@ -3,8 +3,10 @@ import { AmbientBackground } from '@/components/AmbientBackground'
 import { TitleBar } from '@/components/TitleBar'
 import { LoginPage } from '@/pages/LoginPage'
 import { HomePage } from '@/pages/HomePage'
+import { isElectronApp } from '@/lib/web'
+import { WebsiteApp } from '@/web/WebsiteApp'
 
-function Shell() {
+function DesktopShell() {
   const { user, loading } = useAuth()
 
   if (loading) {
@@ -16,18 +18,24 @@ function Shell() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-void text-snow">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-void text-snow">
       <AmbientBackground />
       <TitleBar />
-      {user ? <HomePage /> : <LoginPage />}
+      <div className="relative min-h-0 flex-1">
+        {user ? <HomePage /> : <LoginPage />}
+      </div>
     </div>
   )
 }
 
 export default function App() {
+  if (!isElectronApp()) {
+    return <WebsiteApp />
+  }
+
   return (
     <AuthProvider>
-      <Shell />
+      <DesktopShell />
     </AuthProvider>
   )
 }

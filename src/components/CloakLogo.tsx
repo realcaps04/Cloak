@@ -1,9 +1,12 @@
 export const CLOAK_ICON_SRC = '/cloak-icon.png'
+export const CLOAK_APP_ICON_SRC = '/cloak_app_icon.png'
 export const CLOAK_BRAND_SRC = '/cloak-brand.jpg'
 
 type CloakIconProps = {
   size?: 'sm' | 'md' | 'lg'
   className?: string
+  /** Full branded app icon (default for chrome). */
+  variant?: 'mark' | 'app'
 }
 
 const iconSizes = {
@@ -12,13 +15,14 @@ const iconSizes = {
   lg: 'h-14 w-14',
 }
 
-/** Shield mark only — used in app chrome, sidebar, favicon, taskbar. */
-export function CloakIcon({ size = 'md', className = '' }: CloakIconProps) {
+/** App / shield mark — used in sidebar and chrome. */
+export function CloakIcon({ size = 'md', className = '', variant = 'app' }: CloakIconProps) {
+  const src = variant === 'mark' ? CLOAK_ICON_SRC : CLOAK_APP_ICON_SRC
   return (
     <div
       className={`relative ${iconSizes[size]} shrink-0 overflow-hidden rounded-xl shadow-[0_0_28px_rgba(34,197,94,0.22)] ${className}`}
     >
-      <img src={CLOAK_ICON_SRC} alt="" className="h-full w-full object-contain" />
+      <img src={src} alt="" className="h-full w-full object-cover" />
     </div>
   )
 }

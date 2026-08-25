@@ -10,6 +10,7 @@
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "vite",
+    "web": "vite --mode web --port 5174 --strictPort --open",
     "build": "vite build && electron-builder",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

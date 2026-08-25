@@ -29,4 +29,25 @@ export default defineSchema({
   })
     .index('by_token', ['token'])
     .index('by_discord_id', ['discordId']),
+
+  googleUsers: defineTable({
+    googleId: v.string(),
+    email: v.string(),
+    name: v.string(),
+    picture: v.union(v.string(), v.null()),
+    lastLoginAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index('by_google_id', ['googleId'])
+    .index('by_email', ['email']),
+
+  googleSessions: defineTable({
+    token: v.string(),
+    googleId: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    lastSeenAt: v.number(),
+  })
+    .index('by_token', ['token'])
+    .index('by_google_id', ['googleId']),
 })

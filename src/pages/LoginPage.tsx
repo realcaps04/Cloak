@@ -21,12 +21,15 @@ export function LoginPage() {
   const {
     loginWithDiscord,
     joinCommunityAndVerify,
+    cancelAuth,
     busy,
     waitingForMembership,
     waitingMessage,
     error,
     errorCode,
     discordReady,
+    bridgeReady,
+    configMissing,
     community,
   } = useAuth()
 
@@ -35,7 +38,7 @@ export function LoginPage() {
   const inProgress = busy || waitingForMembership
 
   return (
-    <main className="relative z-10 grid min-h-[calc(100vh-2.25rem)] lg:grid-cols-[1fr_1.05fr]">
+    <main className="relative z-10 grid h-full min-h-0 overflow-y-auto lg:grid-cols-[1fr_1.05fr]">
       <section className="animate-rise flex flex-col justify-center px-8 py-10 lg:px-12">
         <div className="flex items-end gap-3">
           <CloakBrand />
@@ -89,9 +92,9 @@ export function LoginPage() {
 
             <button
               type="button"
-              disabled={inProgress || !discordReady}
+              disabled={inProgress}
               onClick={() => void joinCommunityAndVerify()}
-              className="no-drag mt-4 flex w-full items-center justify-center gap-3 rounded-xl border border-signal-bright/60 bg-signal px-5 py-3.5 text-sm font-bold text-void shadow-[0_0_24px_rgba(34,197,94,0.45)] transition hover:border-signal-bright hover:bg-signal-bright hover:shadow-[0_0_32px_rgba(52,211,153,0.55)] disabled:cursor-not-allowed disabled:border-signal/40 disabled:bg-signal disabled:text-void/90 disabled:opacity-100 disabled:saturate-75 disabled:shadow-[0_0_12px_rgba(34,197,94,0.2)]"
+              className="no-drag mt-4 flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-signal-bright/60 bg-signal px-5 py-3.5 text-sm font-bold text-void shadow-[0_0_24px_rgba(34,197,94,0.45)] transition hover:border-signal-bright hover:bg-signal-bright hover:shadow-[0_0_32px_rgba(52,211,153,0.55)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {waitingForMembership ? (
                 <>
@@ -119,18 +122,36 @@ export function LoginPage() {
             </p>
             <button
               type="button"
-              disabled={inProgress || !discordReady}
+              disabled={inProgress}
               onClick={() => void loginWithDiscord()}
-              className="no-drag mt-3 flex w-full items-center justify-center gap-3 rounded-xl border border-[#7289da] bg-[#5865F2] px-5 py-3.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(88,101,242,0.45)] transition hover:border-[#8ea1ff] hover:bg-[#4752c4] hover:shadow-[0_0_28px_rgba(88,101,242,0.55)] disabled:cursor-not-allowed disabled:border-[#5865F2]/60 disabled:bg-[#5865F2] disabled:text-white disabled:opacity-100 disabled:saturate-75 disabled:shadow-[0_0_10px_rgba(88,101,242,0.25)]"
+              className="no-drag mt-3 flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-[#7289da] bg-[#5865F2] px-5 py-3.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(88,101,242,0.45)] transition hover:border-[#8ea1ff] hover:bg-[#4752c4] hover:shadow-[0_0_28px_rgba(88,101,242,0.55)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <DiscordGlyph className="h-5 w-5" />
               {busy && !waitingForMembership ? 'Checking membership…' : 'Check Discord membership'}
             </button>
           </div>
 
-          {!discordReady && (
-            <p className="mt-4 text-center text-xs leading-relaxed text-mist/80">
-              Add Discord Client ID and Client Secret to `.env`, then restart the app.
+          {inProgress && (
+            <button
+              type="button"
+              onClick={() => void cancelAuth()}
+              className="no-drag mt-3 w-full cursor-pointer text-center text-xs font-medium text-mist underline-offset-2 hover:text-snow hover:underline"
+            >
+              Cancel sign-in
+            </button>
+          )}
+
+          {bridgeReady && !discordReady && configMissing.length > 0 && (
+            <p className="mt-4 text-center text-xs leading-relaxed text-warn">
+              Missing in <code className="text-snow">.env</code>:{' '}
+              {configMissing.join(', ')}. Save the file, then fully restart Cloak (Ctrl+C →{' '}
+              <code className="text-snow">npm run dev</code>).
+            </p>
+          )}
+
+          {bridgeReady && discordReady && (
+            <p className="mt-4 text-center text-xs leading-relaxed text-signal-dim">
+              Discord is ready — click a button above to sign in.
             </p>
           )}
 
@@ -143,9 +164,9 @@ export function LoginPage() {
               {needsGuildJoin && (
                 <button
                   type="button"
-                  disabled={inProgress || !discordReady}
+                  disabled={inProgress}
                   onClick={() => void joinCommunityAndVerify()}
-                  className="no-drag mt-3 text-xs font-semibold text-signal underline-offset-2 hover:underline"
+                  className="no-drag mt-3 cursor-pointer text-xs font-semibold text-signal underline-offset-2 hover:underline"
                 >
                   Try Join {guildName} again →
                 </button>

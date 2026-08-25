@@ -10,10 +10,15 @@ import {
   stopAuthServer,
   openDiscordInvite,
   joinCommunityAndVerify,
+  cancelDiscordAuth,
   type AuthResult,
 } from './discord-auth'
 import { joinProtectedServer } from './join-server'
-import { getDiscordCommunity, isDiscordAuthConfigured } from './discord-config'
+import {
+  getDiscordCommunity,
+  getDiscordConfigStatus,
+  isDiscordAuthConfigured,
+} from './discord-config'
 import { restoreUserSession, revokeUserSession, saveUserSession } from './convex-client'
 import {
   clearStoredSessionToken,
@@ -25,19 +30,31 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 process.env.APP_ROOT = path.join(__dirname, '../..')
 
+function envFileCandidates() {
+  const roots = [
+    process.env.APP_ROOT!,
+    process.cwd(),
+    path.resolve(process.env.APP_ROOT!, '..'),
+  ]
+  return [...new Set(roots.map((root) => path.join(root, '.env')))]
+}
+
 function loadEnvFile() {
-  const envPath = path.join(process.env.APP_ROOT!, '.env')
-  if (!fs.existsSync(envPath)) return
-  const text = fs.readFileSync(envPath, 'utf8')
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) continue
-    const eq = trimmed.indexOf('=')
-    if (eq <= 0) continue
-    const key = trimmed.slice(0, eq).trim()
-    const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
-    if (!(key in process.env)) process.env[key] = value
+  for (const envPath of envFileCandidates()) {
+    if (!fs.existsSync(envPath)) continue
+    const text = fs.readFileSync(envPath, 'utf8')
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const eq = trimmed.indexOf('=')
+      if (eq <= 0) continue
+      const key = trimmed.slice(0, eq).trim().replace(/^\uFEFF/, '')
+      const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
+      if (key) process.env[key] = value
+    }
+    return envPath
   }
+  return null
 }
 
 loadEnvFile()
@@ -64,7 +81,13 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let win: BrowserWindow | null = null
-const preload = path.join(__dirname, '../preload/index.mjs')
+const preloadCandidates = [
+  path.join(__dirname, '../preload/index.cjs'),
+  path.join(__dirname, '../preload/index.js'),
+  path.join(__dirname, '../preload/index.mjs'),
+]
+const preload =
+  preloadCandidates.find((candidate) => fs.existsSync(candidate)) ?? preloadCandidates[0]
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
 function sendAuthResult(payload: AuthResult) {
@@ -105,7 +128,7 @@ async function createWindow() {
       symbolColor: '#C8CDD5',
       height: 36,
     },
-    icon: path.join(process.env.VITE_PUBLIC!, 'cloak-icon.png'),
+    icon: path.join(process.env.VITE_PUBLIC!, 'cloak_app_icon.png'),
     webPreferences: {
       preload,
       contextIsolation: true,
@@ -115,6 +138,16 @@ async function createWindow() {
   })
 
   win.once('ready-to-show', () => win?.show())
+
+  win.webContents.on('preload-error', (_event, preloadPath, error) => {
+    console.error('[cloak] Preload failed:', preloadPath, error)
+  })
+
+  if (!fs.existsSync(preload)) {
+    console.error('[cloak] Preload script missing:', preload)
+  } else {
+    console.log('[cloak] Using preload:', preload)
+  }
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
@@ -228,9 +261,25 @@ ipcMain.handle('cloak:logout', async () => {
   return { ok: true as const }
 })
 
-ipcMain.handle('cloak:discord-configured', () => isDiscordAuthConfigured())
+ipcMain.handle('cloak:discord-configured', () => {
+  loadEnvFile()
+  return isDiscordAuthConfigured()
+})
 
-ipcMain.handle('cloak:discord-community', () => getDiscordCommunity())
+ipcMain.handle('cloak:discord-config-status', () => {
+  loadEnvFile()
+  return getDiscordConfigStatus()
+})
+
+ipcMain.handle('cloak:discord-community', () => {
+  loadEnvFile()
+  return getDiscordCommunity()
+})
+
+ipcMain.handle('cloak:cancel-discord-auth', () => {
+  cancelDiscordAuth()
+  return { ok: true as const }
+})
 
 ipcMain.handle('cloak:open-discord-invite', () => openDiscordInvite())
 

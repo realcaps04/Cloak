@@ -116,6 +116,15 @@ export function stopAuthServer() {
   pendingResolve = null
 }
 
+/** Stop an in-progress OAuth / membership wait and re-enable the login UI. */
+export function cancelDiscordAuth() {
+  if (pendingResolve) {
+    settle(authFailure('Sign-in cancelled.', 'CANCELLED'))
+  } else {
+    stopAuthServer()
+  }
+}
+
 function emitWaiting(payload: MembershipWaitingPayload) {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send('cloak:membership-waiting', payload)

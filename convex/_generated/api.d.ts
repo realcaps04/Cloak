@@ -9,6 +9,7 @@
  */
 
 import type * as users from "../users.js";
+import type * as webAuth from "../webAuth.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +19,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   users: typeof users;
+  webAuth: typeof webAuth;
 }>;
 
 /**

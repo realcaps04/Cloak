@@ -1,6 +1,6 @@
-import { rmSync } from 'node:fs'
+import { copyFileSync, existsSync, rmSync } from 'node:fs'
 import path from 'node:path'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { electronSimple } from 'vite-plugin-electron/multi-env'
@@ -11,9 +11,31 @@ const external = Object.keys(
   'dependencies' in pkg ? (pkg.dependencies as Record<string, string>) : {},
 )
 
+/** notBundle emits require() but Vite names the file .mjs — Electron then skips preload. */
+function fixPreloadCjs(): Plugin {
+  const preloadDir = path.resolve('dist-electron/preload')
+  return {
+    name: 'cloak-fix-preload-cjs',
+    applyToEnvironment(environment) {
+      return environment.name.includes('preload')
+    },
+    closeBundle() {
+      const mjs = path.join(preloadDir, 'index.mjs')
+      const cjs = path.join(preloadDir, 'index.cjs')
+      if (!existsSync(mjs)) return
+      copyFileSync(mjs, cjs)
+      rmSync(mjs, { force: true })
+      console.log('[cloak] Preload written as index.cjs')
+    },
+  }
+}
+
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => {
-  rmSync('dist-electron', { recursive: true, force: true })
+export default defineConfig(({ command, mode }) => {
+  const webOnly = mode === 'web'
+  if (!webOnly) {
+    rmSync('dist-electron', { recursive: true, force: true })
+  }
 
   const isServe = command === 'serve'
   const isBuild = command === 'build'
@@ -28,40 +50,40 @@ export default defineConfig(({ command }) => {
     plugins: [
       react(),
       tailwindcss(),
-      electronSimple({
-        main: {
-          input: 'electron/main/index.ts',
-          plugins: [notBundle()],
-          options: {
-            build: {
-              sourcemap,
-              minify: isBuild,
-              outDir: 'dist-electron/main',
-              rolldownOptions: {
-                external,
+      ...(webOnly
+        ? []
+        : [
+            electronSimple({
+              main: {
+                input: 'electron/main/index.ts',
+                plugins: [notBundle()],
+                options: {
+                  build: {
+                    sourcemap,
+                    minify: isBuild,
+                    outDir: 'dist-electron/main',
+                    rolldownOptions: {
+                      external,
+                    },
+                  },
+                },
               },
-            },
-          },
-        },
-        preload: {
-          input: 'electron/preload/index.ts',
-          plugins: [notBundle()],
-          options: {
-            build: {
-              sourcemap: sourcemap ? 'inline' : undefined, // #332
-              minify: isBuild,
-              outDir: 'dist-electron/preload',
-              rolldownOptions: {
-                external,
+              preload: {
+                input: 'electron/preload/index.ts',
+                plugins: [notBundle(), fixPreloadCjs()],
+                options: {
+                  build: {
+                    sourcemap: sourcemap ? 'inline' : undefined,
+                    minify: isBuild,
+                    outDir: 'dist-electron/preload',
+                    rolldownOptions: {
+                      external: [...external, 'electron'],
+                    },
+                  },
+                },
               },
-            },
-          },
-        },
-        // Polyfill the Electron and Node.js API for Renderer process.
-        // If you want use Node.js in Renderer process, the `nodeIntegration` needs to be enabled in the Main process.
-        // See 👉 https://github.com/electron-vite/vite-plugin-electron-renderer
-        // renderer: {},
-      }),
+            }),
+          ]),
     ],
     clearScreen: false,
   }

@@ -30,6 +30,14 @@ export function isDiscordAuthConfigured() {
   return Boolean(getDiscordClientId() && getDiscordClientSecret() && getDiscordGuildId())
 }
 
+export function getDiscordConfigStatus() {
+  const missing: string[] = []
+  if (!getDiscordClientId()) missing.push('DISCORD_CLIENT_ID')
+  if (!getDiscordClientSecret()) missing.push('DISCORD_CLIENT_SECRET')
+  if (!getDiscordGuildId()) missing.push('DISCORD_GUILD_ID')
+  return { configured: missing.length === 0, missing }
+}
+
 export function getDiscordCommunity() {
   return {
     guildId: getDiscordGuildId(),

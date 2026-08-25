@@ -32,6 +32,11 @@ export type DiscordCommunity = {
   inviteUrl: string
 }
 
+export type DiscordConfigStatus = {
+  configured: boolean
+  missing: string[]
+}
+
 export type JoinResult = { ok: boolean; message: string }
 
 export type CloakApi = {
@@ -43,8 +48,10 @@ export type CloakApi = {
   restoreSession: () => Promise<AuthResult | { ok: false }>
   logout: () => Promise<{ ok: boolean }>
   isDiscordConfigured: () => Promise<boolean>
+  getDiscordConfigStatus: () => Promise<DiscordConfigStatus>
   getDiscordCommunity: () => Promise<DiscordCommunity>
   openDiscordInvite: () => Promise<void>
+  cancelDiscordAuth: () => Promise<{ ok: boolean }>
   onAuthResult: (callback: (result: AuthResult) => void) => () => void
   onMembershipWaiting: (callback: (payload: MembershipWaitingPayload) => void) => () => void
   joinServer: (serverId: string) => Promise<JoinResult>

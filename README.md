@@ -43,6 +43,56 @@ DISCORD_INVITE_URL=https://discord.gg/2KmAr9TUU
 
 If they are not in the server, the app shows a **Join Cloak** button with your invite link.
 
+## Website (Google sign-in)
+
+Local website:
+
+```bash
+npm run web
+```
+
+Opens at `http://localhost:5174`. Desktop Discord login stays on `npm run dev`.
+
+### Google OAuth (local + production)
+
+Use **one** Web OAuth client. Under that client, add:
+
+**Authorized JavaScript origins**
+
+| Environment | Origin |
+|-------------|--------|
+| Local (`npm run dev`) | `http://localhost:5173` |
+| Local website (`npm run web`) | `http://localhost:5174` |
+| Production | `https://your-domain.com` |
+
+**Authorized redirect URIs** (required for the popup sign-in)
+
+| Environment | Redirect URI |
+|-------------|--------------|
+| Local (`npm run dev`) | `http://localhost:5173/google-callback.html` |
+| Local website (`npm run web`) | `http://localhost:5174/google-callback.html` |
+| Production | `https://your-domain.com/google-callback.html` |
+
+Keeping localhost is fine after you go live — it only enables your machine for testing.
+
+Env vars (same Client ID in both places):
+
+```env
+VITE_GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+VITE_CONVEX_URL=https://sleek-shark-313.convex.cloud
+```
+
+Also set `GOOGLE_CLIENT_ID` in [Convex Dashboard](https://dashboard.convex.dev/) → Settings → Environment Variables (backend token check).
+
+OAuth consent screen: while in **Testing**, only Test users can sign in. For public hosting, publish the app (or add each tester).
+
+### How website auth works
+
+1. User opens the hosted site (or localhost)
+2. Clicks **Sign in with Google**
+3. Google returns an ID token; Convex verifies it and creates a `googleSessions` row
+
 ## Build an installer
 
 ```bash

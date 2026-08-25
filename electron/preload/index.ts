@@ -38,8 +38,12 @@ const cloak = {
     ipcRenderer.invoke('cloak:restore-session'),
   logout: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('cloak:logout'),
   isDiscordConfigured: (): Promise<boolean> => ipcRenderer.invoke('cloak:discord-configured'),
+  getDiscordConfigStatus: (): Promise<{ configured: boolean; missing: string[] }> =>
+    ipcRenderer.invoke('cloak:discord-config-status'),
   getDiscordCommunity: () => ipcRenderer.invoke('cloak:discord-community'),
   openDiscordInvite: () => ipcRenderer.invoke('cloak:open-discord-invite'),
+  cancelDiscordAuth: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('cloak:cancel-discord-auth'),
   onAuthResult: (callback: (result: AuthResult) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, result: AuthResult) => callback(result)
     ipcRenderer.on('cloak:auth-result', listener)
@@ -127,4 +131,4 @@ domReady().then(appendLoading)
 window.onmessage = (ev) => {
   if (ev.data?.payload === 'removeLoading') removeLoading()
 }
-setTimeout(removeLoading, 4999)
+setTimeout(removeLoading, 1200)

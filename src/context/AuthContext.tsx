@@ -19,15 +19,43 @@ type AuthContextValue = {
   error: string | null
   errorCode: AuthErrorCode | null
   discordReady: boolean
+  bridgeReady: boolean
+  configMissing: string[]
   community: DiscordCommunity | null
   loginWithDiscord: () => Promise<void>
   joinCommunityAndVerify: () => Promise<void>
   openDiscordInvite: () => Promise<void>
+  cancelAuth: () => Promise<void>
   logout: () => void
   clearError: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+
+async function waitForCloak(maxMs = 8000) {
+  const start = Date.now()
+  while (Date.now() - start < maxMs) {
+    if (window.cloak) return window.cloak
+    await new Promise((resolve) => setTimeout(resolve, 120))
+  }
+  return undefined
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms)
+      }),
+    ])
+  } catch {
+    return null
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CloakUser | null>(null)
@@ -38,6 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [errorCode, setErrorCode] = useState<AuthErrorCode | null>(null)
   const [discordReady, setDiscordReady] = useState(false)
+  const [bridgeReady, setBridgeReady] = useState(false)
+  const [configMissing, setConfigMissing] = useState<string[]>([])
   const [community, setCommunity] = useState<DiscordCommunity | null>(null)
 
   const applyAuthFailure = useCallback((result: { error: string; code?: AuthErrorCode }) => {
@@ -56,15 +86,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setErrorCode(null)
   }, [])
 
+  const refreshDiscordStatus = useCallback(async () => {
+    const cloak = window.cloak ?? (await waitForCloak(2000))
+    if (!cloak) {
+      setBridgeReady(false)
+      setDiscordReady(false)
+      setConfigMissing(['DESKTOP_BRIDGE'])
+      return
+    }
+
+    setBridgeReady(true)
+    const [status, info] = await Promise.all([
+      cloak.getDiscordConfigStatus?.() ?? cloak.isDiscordConfigured().then((configured) => ({
+        configured,
+        missing: configured ? [] : ['DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'DISCORD_GUILD_ID'],
+      })),
+      cloak.getDiscordCommunity(),
+    ])
+    setDiscordReady(status.configured)
+    setConfigMissing(status.missing)
+    setCommunity(info)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
+    let unsubscribeAuth: (() => void) | undefined
+    let unsubscribeWaiting: (() => void) | undefined
 
     async function boot() {
-      void window.cloak?.isDiscordConfigured().then(setDiscordReady)
-      void window.cloak?.getDiscordCommunity().then(setCommunity)
+      const cloak = await waitForCloak()
+      if (cancelled) return
+
+      if (cloak) {
+        setBridgeReady(true)
+
+        unsubscribeAuth = cloak.onAuthResult((result) => {
+          setBusy(false)
+          if (result.ok) {
+            applyAuthSuccess(result.user)
+          } else {
+            applyAuthFailure(result)
+          }
+        })
+
+        unsubscribeWaiting = cloak.onMembershipWaiting((payload) => {
+          setWaitingForMembership(true)
+          setWaitingMessage(payload.message)
+          setError(null)
+          setErrorCode(null)
+        })
+
+        const [status, info] = await Promise.all([
+          cloak.getDiscordConfigStatus?.() ?? cloak.isDiscordConfigured().then((configured) => ({
+            configured,
+            missing: configured ? [] : ['DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'DISCORD_GUILD_ID'],
+          })),
+          cloak.getDiscordCommunity(),
+        ])
+        if (!cancelled) {
+          setDiscordReady(status.configured)
+          setConfigMissing(status.missing)
+          setCommunity(info)
+        }
+      } else if (!cancelled) {
+        setBridgeReady(false)
+        setDiscordReady(false)
+        setConfigMissing(['DESKTOP_BRIDGE'])
+      }
 
       try {
-        const restored = await window.cloak?.restoreSession()
+        const restored = cloak
+          ? await withTimeout(cloak.restoreSession(), 12_000)
+          : null
         if (!cancelled && restored?.ok) {
           applyAuthSuccess(restored.user)
         } else if (!cancelled) {
@@ -83,22 +176,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void boot()
 
-    const unsubscribeAuth = window.cloak?.onAuthResult((result) => {
-      setBusy(false)
-      if (result.ok) {
-        applyAuthSuccess(result.user)
-      } else {
-        applyAuthFailure(result)
-      }
-    })
-
-    const unsubscribeWaiting = window.cloak?.onMembershipWaiting((payload) => {
-      setWaitingForMembership(true)
-      setWaitingMessage(payload.message)
-      setError(null)
-      setErrorCode(null)
-    })
-
     return () => {
       cancelled = true
       unsubscribeAuth?.()
@@ -111,29 +188,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(null)
       setErrorCode(null)
       setBusy(true)
-      setWaitingForMembership(mode === 'join')
-      setWaitingMessage(
-        mode === 'join'
-          ? 'Opening Discord… authorize Cloak, then we verify membership automatically.'
-          : null,
-      )
+      setWaitingForMembership(false)
+      setWaitingMessage(null)
 
       try {
-        if (!window.cloak) {
-          setError('Cloak desktop bridge is not available. Run the app with npm run dev.')
+        const cloak = window.cloak ?? (await waitForCloak(2000))
+        if (!cloak) {
+          setError(
+            'Cloak is open in a browser tab. Close that tab and use the Cloak Beta desktop window instead.',
+          )
           setErrorCode('UNKNOWN')
-          setBusy(false)
-          setWaitingForMembership(false)
-          setWaitingMessage(null)
+          setBridgeReady(false)
+          setConfigMissing(['DESKTOP_BRIDGE'])
           return
         }
 
+        setBridgeReady(true)
+        await refreshDiscordStatus()
+
         const result =
-          mode === 'join' ? await window.cloak.joinAndVerify() : await window.cloak.discordLogin()
+          mode === 'join' ? await cloak.joinAndVerify() : await cloak.discordLogin()
 
         if (result.ok) {
           applyAuthSuccess(result.user)
-        } else {
+        } else if (result.code !== 'CANCELLED') {
           applyAuthFailure(result)
         }
       } catch (err) {
@@ -145,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setBusy(false)
       }
     },
-    [applyAuthFailure, applyAuthSuccess],
+    [applyAuthFailure, applyAuthSuccess, refreshDiscordStatus],
   )
 
   const loginWithDiscord = useCallback(async () => {
@@ -158,6 +236,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const openDiscordInvite = useCallback(async () => {
     await window.cloak?.openDiscordInvite()
+  }, [])
+
+  const cancelAuth = useCallback(async () => {
+    await window.cloak?.cancelDiscordAuth?.()
+    setBusy(false)
+    setWaitingForMembership(false)
+    setWaitingMessage(null)
   }, [])
 
   const logout = useCallback(() => {
@@ -178,10 +263,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error,
       errorCode,
       discordReady,
+      bridgeReady,
+      configMissing,
       community,
       loginWithDiscord,
       joinCommunityAndVerify,
       openDiscordInvite,
+      cancelAuth,
       logout,
       clearError: () => {
         setError(null)
@@ -197,10 +285,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error,
       errorCode,
       discordReady,
+      bridgeReady,
+      configMissing,
       community,
       loginWithDiscord,
       joinCommunityAndVerify,
       openDiscordInvite,
+      cancelAuth,
       logout,
     ],
   )
