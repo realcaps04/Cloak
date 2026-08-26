@@ -20,7 +20,9 @@ export default defineSchema({
     guildName: v.optional(v.string()),
     lastLoginAt: v.number(),
     createdAt: v.number(),
-  }).index('by_discord_id', ['discordId']),
+  })
+    .index('by_discord_id', ['discordId'])
+    .index('by_username', ['username']),
 
   sessions: defineTable({
     token: v.string(),
@@ -189,7 +191,8 @@ export default defineSchema({
   })
     .index('by_server', ['serverId'])
     .index('by_player_username', ['playerDiscordUsername'])
-    .index('by_server_and_player_username', ['serverId', 'playerDiscordUsername']),
+    .index('by_server_and_player_username', ['serverId', 'playerDiscordUsername'])
+    .index('by_player_discord_id', ['playerDiscordId']),
 
   /** Warnings issued to players by Discord username. */
   playerWarnings: defineTable({

@@ -64,6 +64,38 @@ const cloak = {
   },
   joinServer: (serverId: string): Promise<{ ok: boolean; message: string }> =>
     ipcRenderer.invoke('cloak:join-server', serverId),
+  listPlayerServers: (): Promise<{
+    ok: boolean
+    unauthorized?: boolean
+    servers: {
+      id: string
+      name: string
+      tagline: string
+      players: number
+      maxPlayers: number
+      ping: number
+      status: 'online' | 'maintenance' | 'offline'
+      region: string
+      protected: boolean
+      iconUrl?: string | null
+    }[]
+    error?: string
+  }> => ipcRenderer.invoke('cloak:list-player-servers'),
+  noteCopyAttempt: (text: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('cloak:note-copy-attempt', text),
+  reportSecurityEvent: (payload: {
+    eventType: 'f8' | 'copy'
+    keyPressed?: string
+    copiedText?: string
+  }): Promise<{ ok: boolean; error?: string; count?: number }> =>
+    ipcRenderer.invoke('cloak:report-security-event', payload),
+  forceQuit: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('cloak:force-quit'),
+  onDataPoisoned: (callback: (payload: { reason: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { reason: string }) =>
+      callback(payload)
+    ipcRenderer.on('cloak:data-poisoned', listener)
+    return () => ipcRenderer.off('cloak:data-poisoned', listener)
+  },
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('cloak:get-app-version'),
   getUpdateRuntimeInfo: (): Promise<{ packaged: boolean; portable: boolean; version: string }> =>
     ipcRenderer.invoke('cloak:update-runtime-info'),

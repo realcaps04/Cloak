@@ -5,6 +5,11 @@ const SESSION_DAYS = 30
 
 const appRoleValidator = v.optional(v.union(v.literal('user'), v.literal('admin')))
 
+/** Discord usernames are matched case-insensitively (same as admin roster). */
+function normalizeUsername(username: string) {
+  return username.trim().replace(/^@/, '').toLowerCase()
+}
+
 function makeSessionToken() {
   const bytes = new Uint8Array(32)
   crypto.getRandomValues(bytes)
@@ -38,6 +43,9 @@ export const upsertAndCreateSession = mutation({
 
     const now = Date.now()
     const role = resolveAppRole(args.appRole)
+    const username = normalizeUsername(args.username)
+    if (!username) throw new Error('Discord username is required.')
+
     const existing = await ctx.db
       .query('users')
       .withIndex('by_discord_id', (q) => q.eq('discordId', args.discordId))
@@ -45,7 +53,7 @@ export const upsertAndCreateSession = mutation({
 
     if (existing) {
       await ctx.db.patch(existing._id, {
-        username: args.username,
+        username,
         globalName: args.globalName,
         avatar: args.avatar,
         discriminator: args.discriminator,
@@ -57,7 +65,7 @@ export const upsertAndCreateSession = mutation({
     } else {
       await ctx.db.insert('users', {
         discordId: args.discordId,
-        username: args.username,
+        username,
         globalName: args.globalName,
         avatar: args.avatar,
         discriminator: args.discriminator,
@@ -67,6 +75,20 @@ export const upsertAndCreateSession = mutation({
         lastLoginAt: now,
         createdAt: now,
       })
+    }
+
+    // Attach Discord id onto roster grants that match this username so later lookups stay stable.
+    const grants = await ctx.db
+      .query('serverAccess')
+      .withIndex('by_player_username', (q) => q.eq('playerDiscordUsername', username))
+      .collect()
+    for (const grant of grants) {
+      if (grant.playerDiscordId !== args.discordId) {
+        await ctx.db.patch(grant._id, {
+          playerDiscordId: args.discordId,
+          updatedAt: now,
+        })
+      }
     }
 
     // Only replace sessions for this app role so User + Admin can stay signed in together.
@@ -98,7 +120,7 @@ export const upsertAndCreateSession = mutation({
       expiresAt,
       user: {
         id: args.discordId,
-        username: args.username,
+        username,
         globalName: args.globalName,
         avatar: args.avatar,
         discriminator: args.discriminator,

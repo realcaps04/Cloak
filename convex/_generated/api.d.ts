@@ -9,6 +9,7 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as emojiPoison from "../emojiPoison.js";
 import type * as support from "../support.js";
 import type * as users from "../users.js";
 import type * as webAuth from "../webAuth.js";
@@ -21,6 +22,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  emojiPoison: typeof emojiPoison;
   support: typeof support;
   users: typeof users;
   webAuth: typeof webAuth;

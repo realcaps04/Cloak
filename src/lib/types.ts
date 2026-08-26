@@ -37,7 +37,14 @@ export type DiscordConfigStatus = {
   missing: string[]
 }
 
-export type JoinResult = { ok: boolean; message: string }
+export type JoinResult = { ok: boolean; message: string; unauthorized?: boolean }
+
+export type PlayerServersResult = {
+  ok: boolean
+  unauthorized?: boolean
+  servers: import('./servers').CloakServer[]
+  error?: string
+}
 
 export type UpdateAvailability = {
   update: boolean
@@ -72,6 +79,15 @@ export type CloakApi = {
   onAuthResult: (callback: (result: AuthResult) => void) => () => void
   onMembershipWaiting: (callback: (payload: MembershipWaitingPayload) => void) => () => void
   joinServer: (serverId: string) => Promise<JoinResult>
+  listPlayerServers: () => Promise<PlayerServersResult>
+  noteCopyAttempt?: (text: string) => Promise<{ ok: boolean }>
+  reportSecurityEvent?: (payload: {
+    eventType: 'f8' | 'copy'
+    keyPressed?: string
+    copiedText?: string
+  }) => Promise<{ ok: boolean; error?: string; count?: number }>
+  forceQuit?: () => Promise<{ ok: boolean }>
+  onDataPoisoned?: (callback: (payload: { reason: string }) => void) => () => void
   getAppVersion?: () => Promise<string>
   getUpdateRuntimeInfo?: () => Promise<{ packaged: boolean; portable: boolean; version: string }>
   checkForUpdates?: () => Promise<UpdateCheckResult>

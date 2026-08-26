@@ -26,6 +26,8 @@
   --color-signal-bright: #34d399;
   --color-signal-dim: #15803d;
   --color-warn: #f0b45a;
+  --color-alert: #ef4444;
+  --color-alert-bright: #f87171;
 }
 
 @layer base {

@@ -1,6 +1,8 @@
 import { AuthProvider, useAuth } from '@/context/AuthContext'
+import { UnauthorizedPoisonProvider } from '@/context/UnauthorizedPoisonContext'
 import { AmbientBackground } from '@/components/AmbientBackground'
 import { ForceUpdateModal } from '@/components/ForceUpdateModal'
+import { StreamSafetyGuard } from '@/components/StreamSafetyGuard'
 import { TitleBar } from '@/components/TitleBar'
 import { LoginPage } from '@/pages/LoginPage'
 import { AdminLoginPage } from '@/pages/AdminLoginPage'
@@ -48,6 +50,7 @@ function DesktopShell() {
         )}
       </div>
       {!admin ? <ForceUpdateModal /> : null}
+      {!admin ? <StreamSafetyGuard /> : null}
     </div>
   )
 }
@@ -59,7 +62,9 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <DesktopShell />
+      <UnauthorizedPoisonProvider>
+        <DesktopShell />
+      </UnauthorizedPoisonProvider>
     </AuthProvider>
   )
 }

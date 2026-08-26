@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { useUnauthorizedPoison } from '@/context/UnauthorizedPoisonContext'
 import { BetaBadge } from '@/components/BetaBadge'
 import { CloakIcon } from '@/components/CloakLogo'
 import { ServerCard } from '@/components/ServerCard'
 import { TermsPanel } from '@/components/TermsPanel'
 import { UpdatesPanel } from '@/components/UpdatesPanel'
-import { CLOAK_SERVERS } from '@/lib/servers'
+import type { CloakServer } from '@/lib/servers'
 import { TERMS_SECTIONS, scrollToTermsSection } from '@/lib/terms'
 import { avatarUrl, displayName } from '@/lib/types'
 
@@ -100,16 +101,76 @@ function ServersPanel({
 }: {
   onJoin: (serverId: string) => Promise<{ ok: boolean; message: string }>
 }) {
-  const servers = CLOAK_SERVERS
+  const { user } = useAuth()
+  const { activate } = useUnauthorizedPoison()
+  const [servers, setServers] = useState<CloakServer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refresh = useCallback(async () => {
+    if (!user) {
+      setServers([])
+      setLoading(false)
+      setError(null)
+      return
+    }
+    setLoading(true)
+    setError(null)
+    const result = await window.cloak?.listPlayerServers()
+    if (!result) {
+      setServers([])
+      setError('Run Cloak as a desktop app to load your servers.')
+      setLoading(false)
+      return
+    }
+    if (result.unauthorized) {
+      activate('unauthorized-server-list')
+    }
+    setServers(result.servers)
+    if (!result.ok) setError(result.error ?? 'Could not load servers.')
+    setLoading(false)
+  }, [user, activate])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    const onFocus = () => {
+      void refresh()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [refresh])
 
   return (
     <section>
-      <div className="mb-4">
-        <h2 className="font-display text-xl font-semibold text-snow">Your servers</h2>
-        <p className="mt-1 text-sm text-mist">Servers assigned to you will show up here.</p>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-display text-xl font-semibold text-snow">Your servers</h2>
+          <p className="mt-1 text-sm text-mist">
+            Servers appear here after a Server Admin invites your Discord username.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          disabled={loading || !user}
+          className="no-drag rounded-xl border border-line px-3 py-2 text-xs font-medium text-mist transition hover:border-snow/20 hover:text-snow disabled:opacity-50"
+        >
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </button>
       </div>
 
-      {servers.length === 0 ? (
+      {error ? (
+        <p className="mb-4 rounded-xl border border-warn/30 bg-warn/10 px-4 py-3 text-sm text-warn">
+          {error}
+        </p>
+      ) : null}
+
+      {loading && servers.length === 0 ? (
+        <p className="text-sm text-mist">Loading your servers…</p>
+      ) : servers.length === 0 ? (
         <div className="relative overflow-hidden rounded-2xl border border-line bg-panel/50 px-6 py-14 text-center panel-glow">
           <div
             className="pointer-events-none absolute inset-0 opacity-70"
@@ -138,7 +199,9 @@ function ServersPanel({
             No servers yet
           </p>
           <p className="relative mx-auto mt-3 max-w-md text-sm leading-relaxed text-mist">
-            Servers only appear here when the respective server admin gives you access.
+            Ask a Server Admin to invite{' '}
+            <span className="font-semibold text-snow">@{user?.username ?? 'your Discord'}</span> on
+            their Roster. Once approved, the server card shows up here.
           </p>
 
           <div className="relative mx-auto mt-8 flex max-w-lg flex-wrap items-center justify-center gap-2">
@@ -152,12 +215,12 @@ function ServersPanel({
             </span>
             <span className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/60 px-3 py-1.5 text-xs font-medium text-mist">
               <SparkIcon className="h-3.5 w-3.5 text-signal" />
-              Coming with Admin
+              Admin-granted access
             </span>
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           {servers.map((server) => (
             <ServerCard key={server.id} server={server} onJoin={onJoin} />
           ))}
@@ -169,6 +232,7 @@ function ServersPanel({
 
 export function HomePage() {
   const { user, logout } = useAuth()
+  const { activate } = useUnauthorizedPoison()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeNav, setActiveNav] = useState<NavId>('servers')
   const [activeTermsSection, setActiveTermsSection] = useState<string | null>(null)
@@ -177,13 +241,15 @@ export function HomePage() {
 
   const handleJoin = useCallback(async (serverId: string) => {
     if (window.cloak?.joinServer) {
-      return window.cloak.joinServer(serverId)
+      const result = await window.cloak.joinServer(serverId)
+      if (result.unauthorized) activate('unauthorized-join')
+      return result
     }
     return {
       ok: false,
       message: 'Run Cloak as a desktop app to connect to servers.',
     }
-  }, [])
+  }, [activate])
 
   useEffect(() => {
     const api = window.cloak

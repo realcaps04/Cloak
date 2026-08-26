@@ -8,7 +8,6 @@ export type CloakServer = {
   status: 'online' | 'maintenance' | 'offline'
   region: string
   protected: boolean
+  /** Public Convex storage URL for the server icon (never an IP/endpoint). */
+  iconUrl?: string | null
 }
-
-/** Populated from your backend later — empty for now. */
-export const CLOAK_SERVERS: CloakServer[] = []

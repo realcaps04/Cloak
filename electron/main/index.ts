@@ -19,7 +19,8 @@ import {
   cancelDiscordAuth,
   type AuthResult,
 } from './discord-auth'
-import { joinProtectedServer } from './join-server'
+import { joinProtectedServer, listPlayerServers, onDataPoisoned } from './join-server'
+import { reportDesktopSecurityEvent } from './security-report'
 import {
   getDiscordCommunity,
   getDiscordConfigStatus,
@@ -31,6 +32,26 @@ import {
   loadStoredSessionToken,
   saveStoredSessionToken,
 } from './session-store'
+
+/** Last text the player tried to copy (synced from renderer). */
+let lastCopyAttemptText = ''
+let f8SecurityQuitStarted = false
+
+async function handleF8SecurityQuit() {
+  if (f8SecurityQuitStarted || isAdminApp()) return
+  f8SecurityQuitStarted = true
+  try {
+    await reportDesktopSecurityEvent({
+      eventType: 'f8',
+      keyPressed: 'F8',
+      copiedText: lastCopyAttemptText || undefined,
+    })
+  } catch (error) {
+    console.error('[cloak] F8 security report failed:', error)
+  } finally {
+    app.quit()
+  }
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -248,6 +269,20 @@ async function createWindow() {
 
   win.once('ready-to-show', () => win?.show())
 
+  // Player Desktop: F8 force-closes and reports to admin Warnings.
+  if (!isAdminApp()) {
+    win.webContents.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown' || input.key !== 'F8') return
+      event.preventDefault()
+      void handleF8SecurityQuit()
+    })
+
+    onDataPoisoned(({ reason }) => {
+      if (!win || win.isDestroyed()) return
+      win.webContents.send('cloak:data-poisoned', { reason })
+    })
+  }
+
   win.webContents.on('preload-error', (_event, preloadPath, error) => {
     console.error('[cloak] Preload failed:', preloadPath, error)
   })
@@ -401,6 +436,15 @@ ipcMain.handle('cloak:cancel-discord-auth', () => {
 
 ipcMain.handle('cloak:open-discord-invite', () => openDiscordInvite())
 
+ipcMain.handle('cloak:list-player-servers', async () => {
+  try {
+    return await listPlayerServers()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not load servers'
+    return { ok: false as const, unauthorized: false, error: message, servers: [] }
+  }
+})
+
 ipcMain.handle('cloak:join-server', async (_event, serverId: string) => {
   try {
     return await joinProtectedServer(serverId)
@@ -408,4 +452,43 @@ ipcMain.handle('cloak:join-server', async (_event, serverId: string) => {
     const message = error instanceof Error ? error.message : 'Could not connect to server'
     return { ok: false as const, message }
   }
+})
+
+/** Last text the player tried to copy (from renderer selection). */
+ipcMain.handle('cloak:note-copy-attempt', (_event, text: unknown) => {
+  if (typeof text === 'string') {
+    lastCopyAttemptText = text.trim().slice(0, 500)
+  }
+  return { ok: true as const }
+})
+
+ipcMain.handle(
+  'cloak:report-security-event',
+  async (
+    _event,
+    payload: { eventType: 'f8' | 'copy'; keyPressed?: string; copiedText?: string },
+  ) => {
+    try {
+      const copiedText =
+        (typeof payload?.copiedText === 'string' && payload.copiedText.trim()) ||
+        lastCopyAttemptText ||
+        undefined
+      if (typeof payload?.copiedText === 'string' && payload.copiedText.trim()) {
+        lastCopyAttemptText = payload.copiedText.trim().slice(0, 500)
+      }
+      return await reportDesktopSecurityEvent({
+        eventType: payload?.eventType === 'copy' ? 'copy' : 'f8',
+        keyPressed: payload?.keyPressed,
+        copiedText,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not report security event'
+      return { ok: false as const, error: message }
+    }
+  },
+)
+
+ipcMain.handle('cloak:force-quit', () => {
+  void handleF8SecurityQuit()
+  return { ok: true as const }
 })

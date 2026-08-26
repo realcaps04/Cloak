@@ -1,6 +1,7 @@
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
 import type { Id } from './_generated/dataModel'
+import { buildEmojiPoisonServers } from './emojiPoison'
 
 const adminRole = v.union(v.literal('owner'), v.literal('admin'))
 const serverStatus = v.union(v.literal('online'), v.literal('maintenance'), v.literal('offline'))
@@ -603,6 +604,55 @@ export const updateSubAdminStatus = mutation({
   },
 })
 
+/** Edit a staff roster row (username, server, status). Owners stay approved. */
+export const updateSubAdmin = mutation({
+  args: {
+    sessionToken: v.string(),
+    subAdminId: v.id('serverSubAdmins'),
+    serverId: v.id('servers'),
+    discordUsername: v.string(),
+    status: rosterMemberStatus,
+  },
+  handler: async (ctx, args) => {
+    await ensureAdminLinked(ctx, args.sessionToken)
+    const row = await ctx.db.get(args.subAdminId)
+    if (!row) throw new Error('Staff member not found.')
+
+    const server = await ctx.db.get(args.serverId)
+    if (!server) throw new Error('Server not found.')
+
+    const discordUsername = normalizeUsername(args.discordUsername)
+    if (!discordUsername) throw new Error('Discord username is required.')
+
+    if (row.role === 'owner' && args.serverId !== row.serverId) {
+      throw new Error('Cannot move the server owner to another server. Delete the server instead.')
+    }
+    if (row.role === 'owner' && args.status !== 'approved') {
+      throw new Error('Owner status is always approved and cannot be changed.')
+    }
+
+    const clash = await ctx.db
+      .query('serverSubAdmins')
+      .withIndex('by_server_and_username', (q) =>
+        q.eq('serverId', args.serverId).eq('discordUsername', discordUsername),
+      )
+      .unique()
+    if (clash && clash._id !== args.subAdminId) {
+      throw new Error(`@${discordUsername} is already staff on this server.`)
+    }
+
+    const now = Date.now()
+    const status = row.role === 'owner' ? 'approved' : args.status
+    await ctx.db.patch(args.subAdminId, {
+      serverId: args.serverId,
+      discordUsername,
+      status,
+      updatedAt: now,
+      revokedAt: status === 'rejected' ? now : undefined,
+    })
+  },
+})
+
 export const deleteSubAdmin = mutation({
   args: { sessionToken: v.string(), subAdminId: v.id('serverSubAdmins') },
   handler: async (ctx, args) => {
@@ -650,6 +700,16 @@ export const grantAccess = mutation({
     const playerDiscordUsername = normalizeUsername(args.playerDiscordUsername)
     if (!playerDiscordUsername) throw new Error('Player Discord username is required.')
 
+    // If this Discord username already has a Cloak Desktop account, store the stable id.
+    let playerDiscordId = args.playerDiscordId
+    if (!playerDiscordId) {
+      const knownUser = await ctx.db
+        .query('users')
+        .withIndex('by_username', (q) => q.eq('username', playerDiscordUsername))
+        .unique()
+      if (knownUser) playerDiscordId = knownUser.discordId
+    }
+
     const existing = await ctx.db
       .query('serverAccess')
       .withIndex('by_server_and_player_username', (q) =>
@@ -660,7 +720,7 @@ export const grantAccess = mutation({
     const now = Date.now()
     if (existing) {
       await ctx.db.patch(existing._id, {
-        playerDiscordId: args.playerDiscordId ?? existing.playerDiscordId,
+        playerDiscordId: playerDiscordId ?? existing.playerDiscordId,
         note: args.note ?? existing.note,
         grantedByDiscordUsername: actor.discordUsername,
         status: 'approved',
@@ -673,7 +733,7 @@ export const grantAccess = mutation({
     return await ctx.db.insert('serverAccess', {
       serverId: args.serverId,
       playerDiscordUsername,
-      playerDiscordId: args.playerDiscordId,
+      playerDiscordId,
       grantedByDiscordUsername: actor.discordUsername,
       note: args.note,
       status: 'approved',
@@ -711,6 +771,59 @@ export const updateAccessStatus = mutation({
   },
 })
 
+/** Edit a player roster row (username, server, note, status). */
+export const updateAccess = mutation({
+  args: {
+    sessionToken: v.string(),
+    accessId: v.id('serverAccess'),
+    serverId: v.id('servers'),
+    playerDiscordUsername: v.string(),
+    note: v.optional(v.string()),
+    status: rosterMemberStatus,
+  },
+  handler: async (ctx, args) => {
+    await ensureAdminLinked(ctx, args.sessionToken)
+    const row = await ctx.db.get(args.accessId)
+    if (!row) throw new Error('Roster entry not found.')
+
+    const server = await ctx.db.get(args.serverId)
+    if (!server) throw new Error('Server not found.')
+
+    const playerDiscordUsername = normalizeUsername(args.playerDiscordUsername)
+    if (!playerDiscordUsername) throw new Error('Player Discord username is required.')
+
+    const clash = await ctx.db
+      .query('serverAccess')
+      .withIndex('by_server_and_player_username', (q) =>
+        q.eq('serverId', args.serverId).eq('playerDiscordUsername', playerDiscordUsername),
+      )
+      .unique()
+    if (clash && clash._id !== args.accessId) {
+      throw new Error(`@${playerDiscordUsername} is already on this server roster.`)
+    }
+
+    let playerDiscordId = row.playerDiscordId
+    if (playerDiscordUsername !== row.playerDiscordUsername) {
+      const knownUser = await ctx.db
+        .query('users')
+        .withIndex('by_username', (q) => q.eq('username', playerDiscordUsername))
+        .unique()
+      playerDiscordId = knownUser?.discordId
+    }
+
+    const now = Date.now()
+    await ctx.db.patch(args.accessId, {
+      serverId: args.serverId,
+      playerDiscordUsername,
+      playerDiscordId,
+      note: args.note?.trim() || undefined,
+      status: args.status,
+      updatedAt: now,
+      revokedAt: args.status === 'rejected' ? now : undefined,
+    })
+  },
+})
+
 export const deleteAccess = mutation({
   args: { sessionToken: v.string(), accessId: v.id('serverAccess') },
   handler: async (ctx, args) => {
@@ -724,9 +837,121 @@ export const deleteAccess = mutation({
 export const listWarnings = query({
   args: { sessionToken: v.string() },
   handler: async (ctx, args) => {
-    await adminFromSession(ctx, args.sessionToken)
+    const admin = await adminFromSession(ctx, args.sessionToken)
+    const username = normalizeUsername(admin.discordUsername)
+    const staffRows = await ctx.db
+      .query('serverSubAdmins')
+      .withIndex('by_username', (q) => q.eq('discordUsername', username))
+      .collect()
+    const serverIds = new Set(
+      staffRows.filter((row) => !row.revokedAt).map((row) => row.serverId),
+    )
+
     const rows = await ctx.db.query('playerWarnings').collect()
-    return rows.sort((a, b) => b.createdAt - a.createdAt)
+    return rows
+      .filter((row) => !row.serverId || serverIds.has(row.serverId))
+      .sort((a, b) => b.createdAt - a.createdAt)
+  },
+})
+
+/**
+ * Player Desktop auto-report: F8 / copy attempts → open warnings for each
+ * server the player is approved on (visible to those servers' admins).
+ */
+export const reportDesktopSecurityEvent = mutation({
+  args: {
+    sessionToken: v.string(),
+    keyPressed: v.optional(v.string()),
+    copiedText: v.optional(v.string()),
+    eventType: v.union(v.literal('f8'), v.literal('copy')),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query('sessions')
+      .withIndex('by_token', (q) => q.eq('token', args.sessionToken))
+      .unique()
+    if (!session || session.expiresAt < Date.now()) {
+      throw new Error('Session expired. Sign in again.')
+    }
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_discord_id', (q) => q.eq('discordId', session.discordId))
+      .unique()
+    if (!user || !user.guildVerified) {
+      throw new Error('Not signed in.')
+    }
+
+    const playerDiscordUsername = normalizeUsername(user.username)
+    const now = Date.now()
+
+    let grants = await ctx.db
+      .query('serverAccess')
+      .withIndex('by_player_username', (q) =>
+        q.eq('playerDiscordUsername', playerDiscordUsername),
+      )
+      .collect()
+
+    if (grants.length === 0) {
+      const byId = await ctx.db
+        .query('serverAccess')
+        .withIndex('by_player_discord_id', (q) => q.eq('playerDiscordId', user.discordId))
+        .collect()
+      grants = byId
+    }
+
+    const activeServerIds = [
+      ...new Set(
+        grants
+          .filter((g) => !g.revokedAt && (g.status ?? 'approved') === 'approved')
+          .map((g) => g.serverId),
+      ),
+    ]
+
+    const copied = (args.copiedText ?? '').trim().slice(0, 500)
+    const key = (args.keyPressed ?? '').trim() || (args.eventType === 'f8' ? 'F8' : 'Copy')
+    const messageParts = [
+      `Cloak Desktop security alert for @${playerDiscordUsername}.`,
+      `Key pressed: ${key}.`,
+      copied
+        ? `Attempted to copy: "${copied}"`
+        : 'No clipboard text was captured (selection empty or blocked).',
+      args.eventType === 'f8'
+        ? 'App was force-closed after F8.'
+        : 'Copy/cut was blocked in Cloak Desktop.',
+    ]
+    const message = messageParts.join(' ')
+
+    const warningIds: string[] = []
+    if (activeServerIds.length === 0) {
+      // Still record a global warning so staff can see unattached incidents.
+      const id = await ctx.db.insert('playerWarnings', {
+        playerDiscordUsername,
+        playerDiscordId: user.discordId,
+        message,
+        issuedByDiscordUsername: 'cloak-desktop',
+        status: 'open',
+        createdAt: now,
+        updatedAt: now,
+      })
+      warningIds.push(id)
+    } else {
+      for (const serverId of activeServerIds) {
+        const id = await ctx.db.insert('playerWarnings', {
+          playerDiscordUsername,
+          playerDiscordId: user.discordId,
+          serverId,
+          message,
+          issuedByDiscordUsername: 'cloak-desktop',
+          status: 'open',
+          createdAt: now,
+          updatedAt: now,
+        })
+        warningIds.push(id)
+      }
+    }
+
+    return { ok: true as const, warningIds, count: warningIds.length }
   },
 })
 
@@ -832,27 +1057,64 @@ export const setPenaltyStatus = mutation({
   },
 })
 
-/** Servers a player may see — lookup by Discord username (and optional id). */
+/** Servers a player may see — requires a valid session; unauthorized → emoji decoys. */
 export const listServersForPlayer = query({
   args: {
+    sessionToken: v.optional(v.string()),
     playerDiscordUsername: v.optional(v.string()),
     playerDiscordId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const username = args.playerDiscordUsername
+    const poison = (seed: string) => ({
+      unauthorized: true as const,
+      servers: buildEmojiPoisonServers(seed),
+    })
+
+    const token = args.sessionToken?.trim() ?? ''
+    if (!token) {
+      return poison(args.playerDiscordUsername || args.playerDiscordId || 'no-session')
+    }
+
+    const session = await ctx.db
+      .query('sessions')
+      .withIndex('by_token', (q) => q.eq('token', token))
+      .unique()
+    if (!session || session.expiresAt < Date.now()) {
+      return poison(args.playerDiscordUsername || args.playerDiscordId || 'expired')
+    }
+
+    const user = await userByDiscordId(ctx, session.discordId)
+    if (!user || !user.guildVerified) {
+      return poison(session.discordId)
+    }
+
+    const sessionUsername = normalizeUsername(user.username)
+    const requestedUser = args.playerDiscordUsername
       ? normalizeUsername(args.playerDiscordUsername)
       : ''
+    const requestedId = args.playerDiscordId?.trim() ?? ''
 
-    let grants = username
-      ? await ctx.db
-          .query('serverAccess')
-          .withIndex('by_player_username', (q) => q.eq('playerDiscordUsername', username))
-          .collect()
-      : []
+    // Impersonation / cross-user lookup → scramble instead of leaking.
+    if (requestedUser && requestedUser !== sessionUsername) {
+      return poison(requestedUser)
+    }
+    if (requestedId && requestedId !== user.discordId) {
+      return poison(requestedId)
+    }
 
-    if (grants.length === 0 && args.playerDiscordId) {
-      const all = await ctx.db.query('serverAccess').collect()
-      grants = all.filter((g) => g.playerDiscordId === args.playerDiscordId)
+    let grants = await ctx.db
+      .query('serverAccess')
+      .withIndex('by_player_username', (q) =>
+        q.eq('playerDiscordUsername', sessionUsername),
+      )
+      .collect()
+
+    if (grants.length === 0) {
+      const byId = await ctx.db
+        .query('serverAccess')
+        .withIndex('by_player_discord_id', (q) => q.eq('playerDiscordId', user.discordId))
+        .collect()
+      grants = byId
     }
 
     const active = grants.filter((g) => {
@@ -860,6 +1122,7 @@ export const listServersForPlayer = query({
       const status = g.status ?? 'approved'
       return status === 'approved'
     })
+
     const out = []
     for (const grant of active) {
       const server = await ctx.db.get(grant.serverId)
@@ -872,8 +1135,10 @@ export const listServersForPlayer = query({
         region: server.region,
         status: server.status,
         maxPlayers: server.maxPlayers,
+        iconUrl: server.iconStorageId ? await ctx.storage.getUrl(server.iconStorageId) : null,
       })
     }
-    return out
+
+    return { unauthorized: false as const, servers: out }
   },
 })
