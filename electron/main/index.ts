@@ -434,6 +434,38 @@ ipcMain.handle('cloak:cancel-discord-auth', () => {
   return { ok: true as const }
 })
 
+/**
+ * Microsoft Store certification: open the main UI without Discord so testers
+ * are not stuck on an indefinite OAuth spinner (policy 10.1.2.10).
+ */
+ipcMain.handle('cloak:enter-store-review', () => {
+  loadEnvFile()
+  const windowsStore = Boolean(
+    (process as NodeJS.Process & { windowsStore?: boolean }).windowsStore,
+  )
+  const allowed = windowsStore || process.env.CLOAK_ALLOW_REVIEW_MODE === '1'
+  if (!allowed) {
+    return {
+      ok: false as const,
+      error: 'Store review preview is only available in Microsoft Store builds.',
+    }
+  }
+
+  return {
+    ok: true as const,
+    user: {
+      id: 'ms-store-review',
+      username: 'store-reviewer',
+      globalName: 'Store Reviewer',
+      avatar: null,
+      discriminator: '0',
+      guildVerified: true,
+      guildId: undefined,
+      guildName: 'Cloak (Store review)',
+    },
+  }
+})
+
 ipcMain.handle('cloak:open-discord-invite', () => openDiscordInvite())
 
 ipcMain.handle('cloak:list-player-servers', async () => {

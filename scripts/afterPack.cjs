@@ -49,6 +49,13 @@ function writeRuntimeEnv(context) {
     )
   }
 
+  const outHint = `${context.appOutDir || ''} ${context.outDir || ''}`
+  const isStorePack =
+    process.env.CLOAK_STORE_BUILD === '1' || /cloak-store/i.test(outHint)
+  if (isStorePack && !lines.some((line) => line.startsWith('CLOAK_ALLOW_REVIEW_MODE='))) {
+    lines.push('CLOAK_ALLOW_REVIEW_MODE=1')
+  }
+
   const dest = path.join(context.appOutDir, 'resources', 'cloak-runtime.env')
   fs.mkdirSync(path.dirname(dest), { recursive: true })
   fs.writeFileSync(dest, `${lines.join('\n')}\n`, 'utf8')

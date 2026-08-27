@@ -38,6 +38,7 @@
     "displayName": "Cloak Desktop",
     "languages": ["en-US"],
     "showNameOnTiles": true,
-    "setBuildNumber": true
+    "setBuildNumber": true,
+    "backgroundColor": "#0A0C0E"
   }
 }

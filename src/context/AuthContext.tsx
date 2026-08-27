@@ -24,6 +24,7 @@ type AuthContextValue = {
   community: DiscordCommunity | null
   loginWithDiscord: () => Promise<void>
   joinCommunityAndVerify: () => Promise<void>
+  enterStoreReview: () => Promise<void>
   openDiscordInvite: () => Promise<void>
   cancelAuth: () => Promise<void>
   logout: () => void
@@ -191,6 +192,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setWaitingForMembership(false)
       setWaitingMessage(null)
 
+      const safetyTimer = window.setTimeout(() => {
+        void window.cloak?.cancelDiscordAuth?.()
+        setBusy(false)
+        setWaitingForMembership(false)
+        setWaitingMessage(null)
+        setError(
+          'Discord sign-in timed out. Complete authorization in the browser, or try Cancel and sign in again.',
+        )
+        setErrorCode('UNKNOWN')
+      }, 100_000)
+
       try {
         const cloak = window.cloak ?? (await waitForCloak(2000))
         if (!cloak) {
@@ -220,6 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setWaitingForMembership(false)
         setWaitingMessage(null)
       } finally {
+        window.clearTimeout(safetyTimer)
         setBusy(false)
       }
     },
@@ -233,6 +246,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const joinCommunityAndVerify = useCallback(async () => {
     await runAuth('join')
   }, [runAuth])
+
+  const enterStoreReview = useCallback(async () => {
+    setError(null)
+    setErrorCode(null)
+    setBusy(true)
+    try {
+      const result = await window.cloak?.enterStoreReview?.()
+      if (!result?.ok) {
+        setError(result?.error ?? 'Store review preview is unavailable.')
+        setErrorCode('UNKNOWN')
+        return
+      }
+      applyAuthSuccess(result.user)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open review preview.')
+      setErrorCode('UNKNOWN')
+    } finally {
+      setBusy(false)
+    }
+  }, [applyAuthSuccess])
 
   const openDiscordInvite = useCallback(async () => {
     await window.cloak?.openDiscordInvite()
@@ -268,6 +301,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       community,
       loginWithDiscord,
       joinCommunityAndVerify,
+      enterStoreReview,
       openDiscordInvite,
       cancelAuth,
       logout,
@@ -290,6 +324,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       community,
       loginWithDiscord,
       joinCommunityAndVerify,
+      enterStoreReview,
       openDiscordInvite,
       cancelAuth,
       logout,

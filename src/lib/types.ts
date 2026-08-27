@@ -89,7 +89,15 @@ export type CloakApi = {
   forceQuit?: () => Promise<{ ok: boolean }>
   onDataPoisoned?: (callback: (payload: { reason: string }) => void) => () => void
   getAppVersion?: () => Promise<string>
-  getUpdateRuntimeInfo?: () => Promise<{ packaged: boolean; portable: boolean; version: string }>
+  getUpdateRuntimeInfo?: () => Promise<{
+    packaged: boolean
+    portable: boolean
+    version: string
+    windowsStore?: boolean
+  }>
+  enterStoreReview?: () => Promise<
+    { ok: true; user: CloakUser } | { ok: false; error: string }
+  >
   checkForUpdates?: () => Promise<UpdateCheckResult>
   startUpdateDownload?: () => Promise<void | { ok: boolean; message?: string }>
   cancelUpdateDownload?: () => Promise<void | { ok: boolean }>

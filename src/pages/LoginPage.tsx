@@ -23,6 +23,7 @@ export function LoginPage() {
   const {
     loginWithDiscord,
     joinCommunityAndVerify,
+    enterStoreReview,
     cancelAuth,
     busy,
     waitingForMembership,
@@ -36,10 +37,13 @@ export function LoginPage() {
   } = useAuth()
 
   const [isPackagedApp, setIsPackagedApp] = useState(false)
+  const [showStoreReview, setShowStoreReview] = useState(false)
 
   useEffect(() => {
     void window.cloak?.getUpdateRuntimeInfo?.().then((info) => {
       setIsPackagedApp(Boolean(info.packaged))
+      // Store AppX sets windowsStore; packaged Store builds also get review mode via env.
+      setShowStoreReview(Boolean(info.windowsStore) || Boolean(info.packaged))
     })
   }, [])
 
@@ -99,7 +103,7 @@ export function LoginPage() {
             </p>
             <p className="mt-1 text-xs leading-relaxed text-mist">
               Opens Discord (app or website) to {guildName}, then verifies membership in the
-              background.
+              background. If the browser does not return, sign-in auto-cancels after 90 seconds.
             </p>
 
             <button
@@ -142,6 +146,26 @@ export function LoginPage() {
               {busy && !waitingForMembership ? 'Checking membership…' : 'Check Discord membership'}
             </button>
           </div>
+
+          {showStoreReview ? (
+            <div className="mt-4 rounded-xl border border-line bg-panel/40 px-4 py-3">
+              <p className="text-xs font-semibold tracking-wide text-mist uppercase">
+                Microsoft Store review
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-mist">
+                Opens the main Cloak UI without Discord so certification can continue if OAuth is
+                unavailable in the test environment.
+              </p>
+              <button
+                type="button"
+                disabled={inProgress}
+                onClick={() => void enterStoreReview()}
+                className="no-drag mt-3 w-full cursor-pointer rounded-xl border border-line bg-ink px-4 py-2.5 text-sm font-semibold text-snow transition hover:border-snow/25 disabled:opacity-60"
+              >
+                Preview Cloak (Store review)
+              </button>
+            </div>
+          ) : null}
 
           {inProgress && (
             <button

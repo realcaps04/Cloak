@@ -206,6 +206,9 @@ export function update(win: Electron.BrowserWindow) {
       packaged: app.isPackaged,
       portable: isPortableRuntime(),
       version: app.getVersion(),
+      windowsStore: Boolean(
+        (process as NodeJS.Process & { windowsStore?: boolean }).windowsStore,
+      ),
     }))
   }
 

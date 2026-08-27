@@ -42,7 +42,24 @@ export type MembershipWaitingPayload = {
 }
 
 const MEMBERSHIP_POLL_MS = 4000
-const MEMBERSHIP_WAIT_MS = 5 * 60 * 1000
+/** Keep membership wait short enough for Store certification (no indefinite load). */
+const MEMBERSHIP_WAIT_MS = 2 * 60 * 1000
+/** Hard cap for the whole Discord OAuth flow (browser never returns). */
+const AUTH_FLOW_TIMEOUT_MS = 90 * 1000
+
+let authServer: http.Server | null = null
+let pendingState: string | null = null
+let pendingResolve: ((result: AuthResult) => void) | null = null
+let membershipPollTimer: ReturnType<typeof setTimeout> | null = null
+let authFlowTimer: ReturnType<typeof setTimeout> | null = null
+let membershipWaitDeadline = 0
+
+function clearAuthFlowTimer() {
+  if (authFlowTimer) {
+    clearTimeout(authFlowTimer)
+    authFlowTimer = null
+  }
+}
 
 function authPort() {
   return getAuthPort()
@@ -64,12 +81,6 @@ function inviteCodeFromUrl(inviteUrl: string) {
     return ''
   }
 }
-
-let authServer: http.Server | null = null
-let pendingState: string | null = null
-let pendingResolve: ((result: AuthResult) => void) | null = null
-let membershipPollTimer: ReturnType<typeof setTimeout> | null = null
-let membershipWaitDeadline = 0
 
 function htmlPage(title: string, body: string) {
   return `<!doctype html>
@@ -113,6 +124,7 @@ function clearMembershipPoll() {
 
 export function stopAuthServer() {
   clearMembershipPoll()
+  clearAuthFlowTimer()
   if (authServer) {
     authServer.close()
     authServer = null
@@ -138,6 +150,7 @@ function emitWaiting(payload: MembershipWaitingPayload) {
 
 function settle(result: AuthResult) {
   clearMembershipPoll()
+  clearAuthFlowTimer()
   pendingResolve?.(result)
   pendingResolve = null
   pendingState = null
@@ -306,6 +319,9 @@ async function exchangeCode(code: string): Promise<CloakUser> {
 
 export async function handleAuthCallback(url: string): Promise<AuthResult> {
   try {
+    // Browser returned — stop the OAuth-wait timer; membership has its own deadline.
+    clearAuthFlowTimer()
+
     const parsed = new URL(url)
     const code = parsed.searchParams.get('code')
     const state = parsed.searchParams.get('state')
@@ -437,11 +453,17 @@ export function startDiscordAuth(options: StartAuthOptions = {}): Promise<AuthRe
       settle(authFailure('Could not start the local Discord login helper.', 'UNKNOWN'))
     })
 
-    setTimeout(() => {
+    clearAuthFlowTimer()
+    authFlowTimer = setTimeout(() => {
       if (pendingResolve) {
-        settle(authFailure('Discord login timed out. Please try again.', 'UNKNOWN'))
+        settle(
+          authFailure(
+            'Discord sign-in timed out. Complete authorization in the browser within 90 seconds, or tap Cancel and try again.',
+            'UNKNOWN',
+          ),
+        )
       }
-    }, MEMBERSHIP_WAIT_MS + 60_000)
+    }, AUTH_FLOW_TIMEOUT_MS)
   })
 }
 

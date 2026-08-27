@@ -1,7 +1,7 @@
 {
   "name": "cloak",
   "productName": "Cloak Desktop",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "FiveM server connector that keeps IP links inside the app.",
   "license": "UNLICENSED",
@@ -18,7 +18,8 @@
     "web": "vite --mode web --port 5174 --strictPort --open",
     "build": "vite build && electron-builder",
     "build:admin": "vite build --mode admin && electron-builder --config electron-builder.admin.json",
-    "build:store": "vite build && electron-builder --config electron-builder.store.json",
+    "generate:appx-assets": "node scripts/generate-appx-assets.cjs",
+    "build:store": "node scripts/generate-appx-assets.cjs && vite build && electron-builder --config electron-builder.store.json",
     "build:web": "vite build --mode web",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

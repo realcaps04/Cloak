@@ -51,6 +51,9 @@ const cloak = {
   openDiscordInvite: () => ipcRenderer.invoke('cloak:open-discord-invite'),
   cancelDiscordAuth: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('cloak:cancel-discord-auth'),
+  enterStoreReview: (): Promise<
+    { ok: true; user: CloakUser } | { ok: false; error: string }
+  > => ipcRenderer.invoke('cloak:enter-store-review'),
   onAuthResult: (callback: (result: AuthResult) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, result: AuthResult) => callback(result)
     ipcRenderer.on('cloak:auth-result', listener)
